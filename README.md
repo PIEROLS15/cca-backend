@@ -1,6 +1,6 @@
 # Comunidad Campesina Asia - Backend
 
-[![CI](https://github.com/PIEROLS15/comunidad-campesina-asia/actions/workflows/ci.yml/badge.svg)](https://github.com/PIEROLS15/comunidad-campesina-asia/actions/workflows/ci.yml)
+[![CI](https://github.com/PIEROLS15/cca-backend/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PIEROLS15/cca-backend/actions/workflows/ci.yml)
 ![Node.js](https://img.shields.io/badge/node-%3E%3D20-green)
 ![Express](https://img.shields.io/badge/express-5.x-black)
 ![Prisma](https://img.shields.io/badge/prisma-6.16.2-2D3748)
@@ -143,4 +143,8 @@ pnpm run prisma:studio     # Abre Prisma Studio
 
 ## Licencia
 
-Este proyecto usa licencia **ISC** (segun `package.json`).
+Este proyecto usa licencia **ISC**.
+
+---
+
+Desarrollado por [PIEROLS15](https://github.com/PIEROLS15)
