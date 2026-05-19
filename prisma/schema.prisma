@@ -1,0 +1,186 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ClientType {
+  Comunero
+  Tercero
+}
+
+enum CertificateStatus {
+  PorFirmar
+  PorRecoger
+  Entregado
+}
+
+enum RequestStatus {
+  Pendiente
+  Aprobada
+  Rechazada
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  fullName  String
+  email     String?  @unique
+  dni       String?  @unique
+  isActive  Boolean  @default(true)
+  roleId    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  role Role @relation(fields: [roleId], references: [id])
+
+  certificateRequests   CertificateRequest[]
+  assemblyRecordRequest AssemblyRecordRequest[]
+}
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users           User[]
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+  assignedAt   DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model Sector {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  certificates Certificate[]
+}
+
+model TerrainType {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  certificates Certificate[]
+}
+
+model Client {
+  id             Int          @id @default(autoincrement())
+  fullName       String
+  documentNumber String       @unique
+  address        String?
+  phone          String?
+  clientType     ClientType
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  certificates           Certificate[]
+  certificateRequests    CertificateRequest[]
+  assemblyRecordRequests AssemblyRecordRequest[]
+}
+
+model CertificateRequest {
+  id                    Int           @id @default(autoincrement())
+  code                  String        @unique
+  requestNumber         String        @unique
+  clientId              Int
+  userId                Int?
+  description           String?
+  isComunero            Boolean       @default(true)
+  destination           String?
+  requestDescription    String?
+  sectorLocation        String?
+  clientSearchType      String?
+  clientFullName        String?
+  clientDocumentNumber  String?
+  clientAddress         String?
+  partnerSearchType     String?
+  partnerFullName       String?
+  partnerDocumentNumber String?
+  partnerAddress        String?
+  certificateTypes      Json?
+  exposure              String?
+  attachments           Json?
+  createdByDni          String?
+  createdByRole         String?
+  status                RequestStatus @default(Pendiente)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  client      Client       @relation(fields: [clientId], references: [id])
+  user        User?        @relation(fields: [userId], references: [id])
+  certificate Certificate?
+}
+
+model Certificate {
+  id            Int               @id @default(autoincrement())
+  code          String            @unique
+  correlative   Int               @unique
+  clientId      Int
+  requestId     Int?              @unique
+  sectorId      Int?
+  terrainTypeId Int?
+  location      String?
+  mz            String?
+  lot           String?
+  status        CertificateStatus @default(PorFirmar)
+  issuedAt      DateTime?
+  deliveredAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  client                 Client                  @relation(fields: [clientId], references: [id])
+  request                CertificateRequest?     @relation(fields: [requestId], references: [id])
+  sector                 Sector?                 @relation(fields: [sectorId], references: [id])
+  terrainType            TerrainType?            @relation(fields: [terrainTypeId], references: [id])
+  assemblyRecordRequests AssemblyRecordRequest[]
+}
+
+model AssemblyRecordRequest {
+  id            Int           @id @default(autoincrement())
+  code          String        @unique
+  clientId      Int
+  certificateId Int
+  userId        Int?
+  description   String?
+  status        RequestStatus @default(Pendiente)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  client      Client      @relation(fields: [clientId], references: [id])
+  certificate Certificate @relation(fields: [certificateId], references: [id])
+  user        User?       @relation(fields: [userId], references: [id])
+}
