@@ -46,30 +46,6 @@ const deleteCertificateRequest = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
-const getRoleView = asyncHandler(async (req, res) => {
-  const data = await certificateRequestsService.getRoleView(req.user.role, {
-    status: req.query.status,
-    page: req.query.page,
-    limit: req.query.limit,
-  });
-  return sendSuccess(res, {
-    message: "Vista por rol obtenida correctamente",
-    data,
-  });
-});
-
-const previewCertificateRequest = asyncHandler(async (req, res) => {
-  const request = await certificateRequestsService.getCertificateRequestById(Number(req.params.id));
-  res.json({
-    requestNumber: request.requestNumber,
-    client: request.client.fullName,
-    document: request.client.documentNumber,
-    status: request.status,
-    createdAt: request.createdAt,
-    preview: `Solicitud ${request.requestNumber} para ${request.client.fullName}`,
-  });
-});
-
 const downloadCertificateRequestPdf = asyncHandler(async (req, res) => {
   const request = await certificateRequestsService.getCertificateRequestById(Number(req.params.id));
   const pdfBuffer = await buildCertificateRequestPdf(request);
@@ -88,7 +64,5 @@ module.exports = {
   createCertificateRequest,
   updateCertificateRequest,
   deleteCertificateRequest,
-  getRoleView,
-  previewCertificateRequest,
   downloadCertificateRequestPdf,
 };
