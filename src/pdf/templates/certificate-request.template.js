@@ -26,6 +26,8 @@ const normalizeToken = (value) =>
     .toLowerCase()
     .replace(/[_\s-]/g, "");
 
+const toUpperDisplay = (value) => String(value ?? "").toUpperCase();
+
 const toDisplayDate = (value) => {
   const date = value ? new Date(value) : new Date();
   const monthNames = [
@@ -76,7 +78,7 @@ const drawAttachmentLine = (doc, marker, label) => {
 
   doc.text(marker, markerX, y, { width: 34, align: "left", lineGap: 0 });
   doc.text(label, labelX, y, { width: 430, align: "left", lineGap: 0 });
-  doc.moveDown(0.06);
+  doc.moveDown(0.01);
 };
 
 const buildCertificateRequestTemplatePdf = async (request) => {
@@ -110,9 +112,9 @@ const buildCertificateRequestTemplatePdf = async (request) => {
         doc.image(logoPath, 42, 20, { fit: [158, 54] });
       }
 
-      doc.font("Times-Roman").fontSize(12).text(YEAR_TEXT, 282, 26, {
+      doc.font("Times-Roman").fontSize(14).text(YEAR_TEXT, 270, 26, {
         align: "center",
-        width: 260,
+        width: 280,
       });
 
       const requestNumber = toHeaderRequestNumber(request.requestNumber);
@@ -120,66 +122,68 @@ const buildCertificateRequestTemplatePdf = async (request) => {
         ? `N°${requestNumber} - SOLICITUD COMUNERO`
         : `N°${requestNumber} - SOLICITUD NO COMUNERO`;
 
-      doc.font("Times-Bold").fontSize(13.8).text(headerTitle, 50, 84, {
+      doc.font("Times-Bold").fontSize(16).text(headerTitle, 50, 92, {
         width: 492,
         align: "center",
         underline: true,
       });
 
-      doc.font("Times-Roman").fontSize(11.2).text(toDisplayDate(request.createdAt), 50, 124, {
+      doc.font("Times-Roman").fontSize(12).text(toDisplayDate(request.createdAt), 50, 132, {
         width: 492,
         align: "right",
       });
 
-      doc.y = 170;
-      doc.font("Times-Roman").fontSize(11.8).text("SOLICITO, TRASPASO", 52, doc.y, { lineGap: 0 });
-      doc.moveDown(0.88);
+      doc.y = 156;
+      doc.font("Times-Roman").fontSize(12).text("SOLICITO, TRASPASO", 52, doc.y, { lineGap: 0 });
+      doc.moveDown(0.55);
 
       const optionsY = doc.y;
       doc.text(`CERTIFICADO DE POSESION ${mark(certificateChecked)}`, 52, optionsY, { width: 240, lineGap: 0 });
-      doc.text(`PLANO Y MEMORIA ${mark(planoChecked)}`, 296, optionsY, { width: 190, lineGap: 0 });
-      doc.text(`OTROS ${mark(otherChecked)}`, 448, optionsY, { width: 96, lineGap: 0, align: "left" });
-      doc.y = optionsY + doc.currentLineHeight(true) + 6;
+      doc.text(`PLANO Y MEMORIA ${mark(planoChecked)}`, 325, optionsY, { width: 190, lineGap: 0 });
+      doc.text(`OTROS ${mark(otherChecked)}`, 498, optionsY, { width: 80, lineGap: 0, align: "left" });
+      doc.y = optionsY + doc.currentLineHeight(true) + 4;
 
       if (otherChecked && otherLabel) {
-        doc.fontSize(11.2).text(otherLabel, 52, doc.y, { width: 492, lineGap: 0 });
-        doc.moveDown(0.7);
+        doc.fontSize(12).text(toUpperDisplay(otherLabel), 52, doc.y, { width: 492, lineGap: 0 });
+        doc.moveDown(0.35);
       }
+      doc.moveDown(0.8);
 
-      doc.fontSize(11.8).text(`ANEXO O SECTOR: ${request.sectorLocation || ""}`, 52, doc.y, {
+      doc.fontSize(12).text(`ANEXO O SECTOR: ${toUpperDisplay(request.sectorLocation)}`, 52, doc.y, {
         width: 492,
         lineGap: 0,
       });
-      doc.moveDown(1.75);
+      doc.moveDown(1.6);
 
-      doc.font("Times-Bold").fontSize(12.4).text("SR. ALFREDO ENRIQUE GARCIA PENAS", 52, doc.y, {
+      doc.font("Times-Bold").fontSize(12).text("SR. ALFREDO ENRIQUE GARCIA PENAS", 52, doc.y, {
         width: 492,
         lineGap: 0,
+        characterSpacing: 0.2,
       });
-      doc.font("Times-Roman");
+      doc.font("Times-Roman").fontSize(12);
       doc.text("PRESIDENTE DE LA COMUNIDAD CAMPESINA DE ASIA", 52, doc.y, { width: 492, lineGap: 0 });
-      doc.moveDown(1.1);
+      doc.moveDown(0.65);
 
-      doc.font("Times-Roman").fontSize(11.4);
+      doc.font("Times-Roman").fontSize(12);
 
       const partnerLine =
         partner.fullName || partner.documentNumber
-          ? ` Casado(a) o conviviente con ${partner.fullName || ""}, DNI: ${partner.documentNumber || ""}`
+          ? ` Casado(a) o conviviente con ${toUpperDisplay(partner.fullName)}, DNI: ${toUpperDisplay(partner.documentNumber)}`
           : "";
 
-      const intro = `Yo, ${client.fullName || ""}, identificado con DNI Nro. ${client.documentNumber || ""}, domiciliado en el anexo ${client.address || ""}.${partnerLine}`;
-      doc.text(intro, 52, doc.y, { width: 492, align: "left", lineGap: 0 });
-      doc.moveDown(1.35);
+      const intro = `Yo, ${toUpperDisplay(client.fullName)}, identificado con DNI N° ${toUpperDisplay(client.documentNumber)}, domiciliado en el anexo ${toUpperDisplay(client.address)}.${partnerLine}`;
+      doc.text(intro, 52, doc.y, { width: 470, align: "justify", lineGap: 0 });
+      doc.moveDown(1.2);
 
       doc.text("Ante usted me presento y expongo:", 52, doc.y, { width: 492, lineGap: 0 });
-      doc.moveDown(0.45);
+      doc.moveDown(0.08);
 
-      doc.font("Times-Roman").text(request.exposure || request.requestDescription || "", 52, doc.y, {
-        width: 492,
+      doc.font("Times-Roman").text(toUpperDisplay(request.exposure || request.requestDescription || ""), 52, doc.y, {
+        width: 470,
         align: "left",
         lineGap: 0,
       });
-      doc.moveDown(1.05);
+      doc.moveDown(1.1);
 
       doc.font("Times-Roman").text(
         "Sin otro particular me despido de usted no sin antes reiterarle mi estima personal.",
@@ -187,25 +191,34 @@ const buildCertificateRequestTemplatePdf = async (request) => {
         doc.y,
         { width: 492, lineGap: 0 }
       );
-      doc.moveDown(1.8);
+      doc.moveDown(1.6);
 
       doc.text("Atentamente", 52, doc.y, { width: 492, align: "center", lineGap: 0 });
-      doc.moveDown(1.45);
-      doc.text(".....................................", 52, doc.y, { width: 492, align: "center", lineGap: 0 });
-      doc.moveDown(0.22);
-      doc.text(`DNI: ${client.documentNumber || ""}`, 52, doc.y, { width: 492, align: "center", lineGap: 0 });
-      doc.moveDown(1.35);
+      doc.moveDown(2.75);
+      doc.text("................................................", 52, doc.y, {
+        width: 492,
+        align: "center",
+        lineGap: 0,
+      });
+      doc.moveDown(0.08);
+      doc.text(`DNI: ${toUpperDisplay(client.documentNumber)}`, 52, doc.y, {
+        width: 492,
+        align: "center",
+        lineGap: 0,
+      });
+      doc.moveDown(1.2);
 
       doc.text("Adjunto:", 52, doc.y, { width: 492, lineGap: 0 });
       doc.moveDown(0.65);
+      doc.fontSize(12);
       drawAttachmentLine(doc, mark(copyCertAttachment), "Copia de Certificado anterior");
       drawAttachmentLine(doc, mark(copyDniAttachment), "Copia de DNI");
       drawAttachmentLine(doc, mark(contractAttachment), "Contrato de compra-venta notariado");
       drawAttachmentLine(doc, mark(planoAttachment), "Copia de plano y memoria");
-      drawAttachmentLine(doc, mark(Boolean(cellAttachment)), `Celular Nro. ${cellAttachment?.phoneNumber || ""}`);
+      drawAttachmentLine(doc, mark(Boolean(cellAttachment)), `Celular Nro. ${toUpperDisplay(cellAttachment?.phoneNumber)}`);
 
-      doc.moveDown(0.55);
-      doc.font("Times-Bold").fontSize(10.8).text(CUSTOMER_CARE_TEXT, 52, doc.y, {
+      doc.moveDown(0.8);
+      doc.font("Times-Bold").fontSize(12).text(CUSTOMER_CARE_TEXT, 52, doc.y, {
         width: 492,
         align: "right",
         lineGap: 0,
