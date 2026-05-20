@@ -269,8 +269,6 @@ Query opcional adicional:
 
 - `status=Pendiente|Aprobada|Rechazada`
 
-### GET `/api/certificate-requests/role-view?page=1&limit=10`
-
 ### GET `/api/certificate-requests/:id`
 
 ### GET `/api/certificate-requests/:id/pdf`

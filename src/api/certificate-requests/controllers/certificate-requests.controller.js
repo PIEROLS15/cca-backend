@@ -46,18 +46,6 @@ const deleteCertificateRequest = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
-const getRoleView = asyncHandler(async (req, res) => {
-  const data = await certificateRequestsService.getRoleView(req.user.role, {
-    status: req.query.status,
-    page: req.query.page,
-    limit: req.query.limit,
-  });
-  return sendSuccess(res, {
-    message: "Vista por rol obtenida correctamente",
-    data,
-  });
-});
-
 const downloadCertificateRequestPdf = asyncHandler(async (req, res) => {
   const request = await certificateRequestsService.getCertificateRequestById(Number(req.params.id));
   const pdfBuffer = await buildCertificateRequestPdf(request);
@@ -76,6 +64,5 @@ module.exports = {
   createCertificateRequest,
   updateCertificateRequest,
   deleteCertificateRequest,
-  getRoleView,
   downloadCertificateRequestPdf,
 };

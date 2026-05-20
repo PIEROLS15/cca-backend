@@ -10,11 +10,6 @@ const {
   formatCertificateRequestResponse,
 } = require("../utils/certificate-requests.utils");
 
-const normalizeRoleName = (value) =>
-  String(value || "")
-    .toLowerCase()
-    .replace(/[_\s-]/g, "");
-
 const nextRequestCode = async () => {
   const lastRequest = await prisma.certificateRequest.findFirst({
     orderBy: { id: "desc" },
@@ -224,29 +219,10 @@ const deleteCertificateRequest = async (id) => {
   await prisma.certificateRequest.delete({ where: { id } });
 };
 
-const getRoleView = async (role, query) => {
-  const requests = await listCertificateRequests(query);
-
-  if (normalizeRoleName(role) === normalizeRoleName("Presidente")) {
-    return {
-      role,
-      canApprove: true,
-      ...requests,
-    };
-  }
-
-  return {
-    role,
-    canApprove: false,
-    ...requests,
-  };
-};
-
 module.exports = {
   listCertificateRequests,
   getCertificateRequestById,
   createCertificateRequest,
   updateCertificateRequest,
   deleteCertificateRequest,
-  getRoleView,
 };
