@@ -9,7 +9,6 @@ router.use(authRequired);
 router.get("/", certificateRequestsController.listCertificateRequests);
 router.get("/role-view", certificateRequestsController.getRoleView);
 router.get("/:id", certificateRequestsController.getCertificateRequestById);
-router.get("/:id/preview", certificateRequestsController.previewCertificateRequest);
 router.get("/:id/pdf", certificateRequestsController.downloadCertificateRequestPdf);
 router.post("/", certificateRequestsController.createCertificateRequest);
 router.put("/:id", certificateRequestsController.updateCertificateRequest);

@@ -273,15 +273,7 @@ Query opcional adicional:
 
 ### GET `/api/certificate-requests/:id`
 
-### GET `/api/certificate-requests/:id/preview`
-
 ### GET `/api/certificate-requests/:id/pdf`
-
-Genera el PDF con la plantilla formal de solicitud.
-
-Para mostrar el logo institucional, colocar el archivo exacto:
-
-- `src/assets/logo-comunidad-campesina-asia.png`
 
 ### POST `/api/certificate-requests`
 

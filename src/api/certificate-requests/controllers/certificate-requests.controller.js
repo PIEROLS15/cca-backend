@@ -58,18 +58,6 @@ const getRoleView = asyncHandler(async (req, res) => {
   });
 });
 
-const previewCertificateRequest = asyncHandler(async (req, res) => {
-  const request = await certificateRequestsService.getCertificateRequestById(Number(req.params.id));
-  res.json({
-    requestNumber: request.requestNumber,
-    client: request.client.fullName,
-    document: request.client.documentNumber,
-    status: request.status,
-    createdAt: request.createdAt,
-    preview: `Solicitud ${request.requestNumber} para ${request.client.fullName}`,
-  });
-});
-
 const downloadCertificateRequestPdf = asyncHandler(async (req, res) => {
   const request = await certificateRequestsService.getCertificateRequestById(Number(req.params.id));
   const pdfBuffer = await buildCertificateRequestPdf(request);
@@ -89,6 +77,5 @@ module.exports = {
   updateCertificateRequest,
   deleteCertificateRequest,
   getRoleView,
-  previewCertificateRequest,
   downloadCertificateRequestPdf,
 };
