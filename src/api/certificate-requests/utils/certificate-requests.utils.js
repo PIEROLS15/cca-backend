@@ -1,5 +1,3 @@
-const buildRequestCode = (sequence) => `SolCer${String(sequence).padStart(6, "0")}`;
-
 const buildRequestNumber = (sequence, date = new Date()) => {
   const year = String(date.getFullYear()).slice(-2);
   return `${String(sequence).padStart(6, "0")}-${year}`;
@@ -30,41 +28,45 @@ const normalizeAttachments = (items = []) =>
     phoneNumber: item.phoneNumber || undefined,
   }));
 
-const formatCertificateRequestResponse = (request) => ({
-  id: request.id,
-  requestNumber: request.requestNumber,
-  isComunero: request.isComunero,
-  destination: request.destination || "",
-  status: request.status,
-  requestDescription: request.requestDescription || request.description || "",
-  sectorLocation: request.sectorLocation || "",
-  client: {
-    searchType: request.clientSearchType || "",
-    fullName: request.clientFullName || request.client?.fullName || "",
-    documentNumber: request.clientDocumentNumber || request.client?.documentNumber || "",
-    address: request.clientAddress || request.client?.address || "",
-  },
-  partnerClient: {
-    searchType: request.partnerSearchType || "",
-    fullName: request.partnerFullName || "",
-    documentNumber: request.partnerDocumentNumber || "",
-    address: request.partnerAddress || "",
-  },
-  certificateTypes: Array.isArray(request.certificateTypes) ? request.certificateTypes : [],
-  exposure: request.exposure || "",
-  attachments: Array.isArray(request.attachments) ? request.attachments : [],
-  createdBy: {
-    dni: request.createdByDni || request.user?.dni || "",
-    role: request.createdByRole || request.user?.role?.name || "",
-  },
-  createdAt: request.createdAt,
-  updatedAt: request.updatedAt,
-});
+const formatCertificateRequestResponse = (request) => {
+  const client = request.client || {};
+  const partner = request.partner || {};
+  const user = request.user || {};
+
+  return {
+    id: request.id,
+    requestNumber: request.requestNumber,
+    isComunero: client.clientType === "Comunero",
+    destination: request.destination || "",
+    status: request.status,
+    requestDescription: request.requestDescription || request.description || "",
+    sectorLocation: request.sectorLocation || "",
+    client: {
+      searchType: "Reniec",
+      fullName: client.fullName || "",
+      documentNumber: client.documentNumber || "",
+      address: client.address || "",
+    },
+    partnerClient: {
+      searchType: partner.id ? "Reniec" : "",
+      fullName: partner.fullName || "",
+      documentNumber: partner.documentNumber || "",
+      address: partner.address || "",
+    },
+    certificateTypes: Array.isArray(request.certificateTypes) ? request.certificateTypes : [],
+    exposure: request.exposure || "",
+    attachments: Array.isArray(request.attachments) ? request.attachments : [],
+    createdBy: {
+      dni: user?.dni || "",
+      role: user?.role?.name || "",
+    },
+    createdAt: request.createdAt,
+    updatedAt: request.updatedAt,
+  };
+};
 
 module.exports = {
-  buildRequestCode,
   buildRequestNumber,
-  normalizeValueToken,
   normalizeCertificateTypes,
   normalizeAttachments,
   formatCertificateRequestResponse,

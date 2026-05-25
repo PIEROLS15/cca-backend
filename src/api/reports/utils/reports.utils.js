@@ -2,15 +2,17 @@ const XLSX = require("xlsx");
 
 const buildCertificatesWorkbook = (certificates) => {
   const rows = certificates.map((certificate) => ({
-    Codigo: certificate.code,
-    Correlativo: certificate.correlative,
+    NumeroCertificado: certificate.certificateNumber,
     Estado: certificate.status,
-    Cliente: certificate.client?.fullName || "",
-    Documento: certificate.client?.documentNumber || "",
-    Ubicacion: certificate.location || "",
+    Propietarios: [certificate.client?.fullName, certificate.partner?.fullName].filter(Boolean).join(", "),
+    Documentos: [certificate.client?.documentNumber, certificate.partner?.documentNumber].filter(Boolean).join(", "),
+    Sector: certificate.sector?.name || "",
+    TipoTerreno: certificate.terrainType?.name || "",
     Mz: certificate.mz || "",
     Lote: certificate.lot || "",
-    CodigoSolicitud: certificate.request?.code || "",
+    Ancho: certificate.width ? Number(certificate.width) : "",
+    Largo: certificate.length ? Number(certificate.length) : "",
+    AreaTotal: certificate.totalArea ? Number(certificate.totalArea) : "",
     FechaCreacion: certificate.createdAt,
   }));
 

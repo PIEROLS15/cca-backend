@@ -2,25 +2,26 @@ const prisma = require("../../../config/prisma");
 const HttpError = require("../../../utils/http-error");
 const { buildPaginationResult, getPaginationParams } = require("../../../utils/pagination");
 const {
-  buildRequestCode,
   buildRequestNumber,
-  normalizeValueToken,
   normalizeCertificateTypes,
   normalizeAttachments,
   formatCertificateRequestResponse,
 } = require("../utils/certificate-requests.utils");
 
-const nextRequestCode = async () => {
+const requestIncludes = {
+  client: true,
+  user: { include: { role: true } },
+  partner: true,
+};
+
+const nextRequestNumber = async () => {
   const lastRequest = await prisma.certificateRequest.findFirst({
     orderBy: { id: "desc" },
     select: { id: true },
   });
 
   const nextSequence = (lastRequest?.id || 0) + 1;
-  return {
-    code: buildRequestCode(nextSequence),
-    requestNumber: buildRequestNumber(nextSequence),
-  };
+  return buildRequestNumber(nextSequence);
 };
 
 const listCertificateRequests = async ({ status, page, limit }) => {
@@ -33,15 +34,7 @@ const listCertificateRequests = async ({ status, page, limit }) => {
   const [docs, total] = await Promise.all([
     prisma.certificateRequest.findMany({
       where,
-      include: {
-        client: true,
-        user: {
-          include: {
-            role: true,
-          },
-        },
-        certificate: true,
-      },
+      include: requestIncludes,
       orderBy: { id: "desc" },
       skip: pagination.skip,
       take: pagination.limit,
@@ -57,19 +50,25 @@ const listCertificateRequests = async ({ status, page, limit }) => {
   });
 };
 
-const getCertificateRequestById = async (id) => {
-  const request = await prisma.certificateRequest.findUnique({
-    where: { id },
-    include: {
-      client: true,
-      user: {
-        include: {
-          role: true,
-        },
-      },
-      certificate: true,
-    },
-  });
+const getCertificateRequestById = async (identifier) => {
+  const id = Number(identifier);
+  const isNumeric = !Number.isNaN(id) && String(id) === identifier.trim();
+
+  let request = null;
+
+  if (isNumeric) {
+    request = await prisma.certificateRequest.findUnique({
+      where: { id },
+      include: requestIncludes,
+    });
+  }
+
+  if (!request) {
+    request = await prisma.certificateRequest.findFirst({
+      where: { requestNumber: { startsWith: identifier } },
+      include: requestIncludes,
+    });
+  }
 
   if (!request) {
     throw new HttpError(404, "Solicitud de certificado no encontrada");
@@ -98,7 +97,7 @@ const createCertificateRequest = async (payload, userId) => {
     throw new HttpError(401, "El usuario autenticado no existe o ya no esta disponible");
   }
 
-  const sequenceData = await nextRequestCode();
+  const requestNumber = await nextRequestNumber();
   const isComunero = typeof payload.isComunero === "boolean" ? payload.isComunero : true;
   const clientType = isComunero ? "Comunero" : "Tercero";
 
@@ -118,41 +117,48 @@ const createCertificateRequest = async (payload, userId) => {
     },
   });
 
+  let partnerId = null;
   const partnerClient = payload.partnerClient || {};
+
+  if (partnerClient.fullName || partnerClient.documentNumber) {
+    const partnerDoc = String(partnerClient.documentNumber || "").trim();
+    const partnerName = String(partnerClient.fullName || "").trim();
+
+    if (partnerDoc && partnerName) {
+      const partner = await prisma.client.upsert({
+        where: { documentNumber: partnerDoc },
+        update: {
+          fullName: partnerName,
+          address: partnerClient.address || undefined,
+          clientType: "Tercero",
+        },
+        create: {
+          fullName: partnerName,
+          documentNumber: partnerDoc,
+          address: partnerClient.address || null,
+          phone: null,
+          clientType: "Tercero",
+        },
+      });
+      partnerId = partner.id;
+    }
+  }
 
   const request = await prisma.certificateRequest.create({
     data: {
-      code: sequenceData.code,
-      requestNumber: sequenceData.requestNumber,
+      requestNumber,
       clientId: client.id,
       userId: creator?.id || null,
+      partnerId,
       description: payload.requestDescription || null,
-      isComunero,
       destination: payload.destination || null,
       requestDescription: payload.requestDescription || null,
       sectorLocation: payload.sectorLocation || null,
-      clientSearchType: normalizeValueToken(clientSnapshot.searchType || "Reniec") || "Reniec",
-      clientFullName: clientSnapshot.fullName || client.fullName,
-      clientDocumentNumber: clientSnapshot.documentNumber || client.documentNumber,
-      clientAddress: clientSnapshot.address || client.address || "",
-      partnerSearchType: normalizeValueToken(partnerClient.searchType || "") || null,
-      partnerFullName: partnerClient.fullName || null,
-      partnerDocumentNumber: partnerClient.documentNumber || null,
-      partnerAddress: partnerClient.address || null,
       certificateTypes: normalizeCertificateTypes(payload.certificateTypes || []),
       exposure: payload.exposure || null,
       attachments: normalizeAttachments(payload.attachments || []),
-      createdByDni: creator?.dni || null,
-      createdByRole: creator?.role?.name ? normalizeValueToken(creator.role.name) : null,
     },
-    include: {
-      client: true,
-      user: {
-        include: {
-          role: true,
-        },
-      },
-    },
+    include: requestIncludes,
   });
 
   return formatCertificateRequestResponse(request);
@@ -161,51 +167,64 @@ const createCertificateRequest = async (payload, userId) => {
 const updateCertificateRequest = async (id, payload) => {
   const current = await prisma.certificateRequest.findUnique({
     where: { id },
-    include: {
-      client: true,
-      user: {
-        include: { role: true },
-      },
-    },
+    include: requestIncludes,
   });
 
   if (!current) {
     throw new HttpError(404, "Solicitud de certificado no encontrada");
   }
 
-  const clientSnapshot = payload.client || {};
+  const data = {};
+
+  if (payload.client !== undefined) {
+    const clientSnapshot = payload.client;
+    const doc = String(clientSnapshot.documentNumber || "").trim();
+    const name = String(clientSnapshot.fullName || "").trim();
+
+    if (doc && name) {
+      const isComunero = typeof payload.isComunero === "boolean" ? payload.isComunero : current.client?.clientType === "Comunero";
+      const clientType = isComunero ? "Comunero" : "Tercero";
+
+      const updatedClient = await prisma.client.upsert({
+        where: { documentNumber: doc },
+        update: { fullName: name, address: clientSnapshot.address || undefined, clientType },
+        create: { fullName: name, documentNumber: doc, address: clientSnapshot.address || null, phone: null, clientType },
+      });
+      data.clientId = updatedClient.id;
+    }
+  }
+
   const partnerClient = payload.partnerClient || {};
+
+  if (Object.keys(payload.partnerClient || {}).length > 0) {
+    const partnerDoc = String(partnerClient.documentNumber || "").trim();
+    const partnerName = String(partnerClient.fullName || "").trim();
+
+    if (partnerDoc && partnerName) {
+      const partner = await prisma.client.upsert({
+        where: { documentNumber: partnerDoc },
+        update: { fullName: partnerName, address: partnerClient.address || undefined, clientType: "Tercero" },
+        create: { fullName: partnerName, documentNumber: partnerDoc, address: partnerClient.address || null, phone: null, clientType: "Tercero" },
+      });
+      data.partnerId = partner.id;
+    } else {
+      data.partnerId = null;
+    }
+  }
+
+  if (payload.description !== undefined) data.description = payload.description;
+  if (payload.requestDescription !== undefined) data.requestDescription = payload.requestDescription;
+  if (payload.destination !== undefined) data.destination = payload.destination;
+  if (payload.sectorLocation !== undefined) data.sectorLocation = payload.sectorLocation;
+  if (payload.exposure !== undefined) data.exposure = payload.exposure;
+  if (payload.status !== undefined) data.status = payload.status;
+  if (payload.certificateTypes !== undefined) data.certificateTypes = normalizeCertificateTypes(payload.certificateTypes);
+  if (payload.attachments !== undefined) data.attachments = normalizeAttachments(payload.attachments);
 
   const updated = await prisma.certificateRequest.update({
     where: { id },
-    data: {
-      description: payload.requestDescription || payload.description,
-      isComunero: typeof payload.isComunero === "boolean" ? payload.isComunero : undefined,
-      destination: payload.destination,
-      requestDescription: payload.requestDescription,
-      sectorLocation: payload.sectorLocation,
-      clientSearchType: clientSnapshot.searchType ? normalizeValueToken(clientSnapshot.searchType) : undefined,
-      clientFullName: clientSnapshot.fullName,
-      clientDocumentNumber: clientSnapshot.documentNumber,
-      clientAddress: clientSnapshot.address,
-      partnerSearchType: partnerClient.searchType ? normalizeValueToken(partnerClient.searchType) : undefined,
-      partnerFullName: partnerClient.fullName,
-      partnerDocumentNumber: partnerClient.documentNumber,
-      partnerAddress: partnerClient.address,
-      certificateTypes: payload.certificateTypes ? normalizeCertificateTypes(payload.certificateTypes) : undefined,
-      exposure: payload.exposure,
-      attachments: payload.attachments ? normalizeAttachments(payload.attachments) : undefined,
-      status: payload.status,
-    },
-    include: {
-      client: true,
-      user: {
-        include: {
-          role: true,
-        },
-      },
-      certificate: true,
-    },
+    data,
+    include: requestIncludes,
   });
 
   return formatCertificateRequestResponse(updated);

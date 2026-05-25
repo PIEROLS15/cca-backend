@@ -1,25 +1,32 @@
 const { createPdfWithBarcode } = require("../../../utils/pdf-with-barcode");
 
 const buildCertificatePdf = async (certificate) => {
+  const ownerList = [];
+  if (certificate.owners) {
+    certificate.owners.forEach((o) => ownerList.push(`${o.fullName} (${o.documentNumber})`));
+  }
   const fields = [
-    { label: "Codigo", value: certificate.code },
-    { label: "Correlativo", value: certificate.correlative },
+    { label: "Numero de Certificado", value: certificate.certificateNumber },
     { label: "Estado", value: certificate.status },
-    { label: "Cliente", value: certificate.client?.fullName },
-    { label: "Documento", value: certificate.client?.documentNumber },
-    { label: "Sector", value: certificate.sector?.name },
-    { label: "Tipo de terreno", value: certificate.terrainType?.name },
-    { label: "Ubicacion", value: certificate.location },
-    { label: "Mz", value: certificate.mz },
-    { label: "Lote", value: certificate.lot },
-    { label: "Codigo de solicitud", value: certificate.request?.code },
+    { label: "Propietarios", value: ownerList || "" },
+    { label: "Sector", value: certificate.location?.sectors?.name || "" },
+    { label: "Tipo de Terreno", value: certificate.terrain?.terrainType?.name || "" },
+    { label: "Mz", value: certificate.location?.mz || "" },
+    { label: "Lote", value: certificate.location?.lot || "" },
+    { label: "Ancho", value: certificate.terrain?.width != null ? `${certificate.terrain.width} m` : "" },
+    { label: "Largo", value: certificate.terrain?.length != null ? `${certificate.terrain.length} m` : "" },
+    { label: "Area Total", value: certificate.terrain?.totalArea != null ? `${certificate.terrain.totalArea} m²` : "" },
+    { label: "Norte", value: certificate.borders?.north || "" },
+    { label: "Sur", value: certificate.borders?.south || "" },
+    { label: "Este", value: certificate.borders?.east || "" },
+    { label: "Oeste", value: certificate.borders?.west || "" },
   ];
 
   return createPdfWithBarcode({
     title: "Certificado Comunal",
     subtitle: "Comunidad Campesina de Asia",
     fields,
-    barcodeValue: certificate.code,
+    barcodeValue: certificate.certificateNumber,
     footer: "Documento generado por el sistema de gestion comunal",
   });
 };
