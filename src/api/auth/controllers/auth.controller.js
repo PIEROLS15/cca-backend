@@ -9,9 +9,27 @@ const login = asyncHandler(async (req, res) => {
   }
 
   const result = await authService.login({ username, password });
-  res.json(result);
+
+  res.cookie("token", result.token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 8 * 60 * 60 * 1000,
+  });
+
+  res.json({ user: result.user });
+});
+
+const logout = asyncHandler(async (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+  });
+  res.json({ message: "Sesión cerrada correctamente" });
 });
 
 module.exports = {
   login,
+  logout,
 };
