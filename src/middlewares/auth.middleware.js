@@ -2,13 +2,20 @@ const jwt = require("jsonwebtoken");
 const HttpError = require("../utils/http-error");
 
 const authRequired = (req, res, next) => {
-  const authHeader = req.headers.authorization;
+  let token = null;
 
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return next(new HttpError(401, "Token no proporcionado"));
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.slice(7);
   }
 
-  const token = authHeader.slice(7);
+  if (!token && req.cookies && req.cookies.token) {
+    token = req.cookies.token;
+  }
+
+  if (!token) {
+    return next(new HttpError(401, "Token no proporcionado"));
+  }
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET || "dev-secret");

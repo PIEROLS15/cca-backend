@@ -10,11 +10,12 @@ Este documento lista los endpoints del backend para probarlos uno por uno.
 
 ## Autenticacion
 
-Todos los endpoints (excepto `/health` y `/api/auth/*`) requieren header:
+Todos los endpoints (excepto `/health` y `/api/auth/login`) requieren autenticacion.
+El token JWT se obtiene via `POST /api/auth/login` y se almacena automaticamente en una cookie httpOnly (`token`).
+
+Alternativamente, se puede usar el header:
 
 - `Authorization: Bearer <token>`
-
-Obtienes el token desde `POST /api/auth/login`.
 
 ## Formato de respuesta paginada
 
@@ -55,6 +56,39 @@ Body:
 {
   "username": "admin",
   "password": "123456"
+}
+```
+
+Respuesta: setea una cookie httpOnly `token` con el JWT. Devuelve los datos del usuario:
+
+```json
+{
+  "user": {
+    "id": 1,
+    "username": "admin",
+    "fullName": "Admin",
+    "email": "admin@correo.com",
+    "dni": "00000258",
+    "isActive": true,
+    "role": {
+      "id": 1,
+      "name": "Admin",
+      "description": "Acceso total al sistema",
+      "permissions": []
+    },
+    "createdAt": "2026-05-18T23:55:52.452Z",
+    "updatedAt": "2026-05-18T23:55:52.452Z"
+  }
+}
+```
+
+### POST `/api/auth/logout`
+
+Requiere autenticacion (token en cookie o Authorization header). Limpia la cookie `token`.
+
+```json
+{
+  "message": "Sesión cerrada correctamente"
 }
 ```
 
