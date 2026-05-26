@@ -91,28 +91,17 @@ CREATE TABLE "public"."Client" (
 -- CreateTable
 CREATE TABLE "public"."CertificateRequest" (
     "id" SERIAL NOT NULL,
-    "code" TEXT NOT NULL,
     "requestNumber" TEXT NOT NULL,
     "clientId" INTEGER NOT NULL,
     "userId" INTEGER,
+    "partnerId" INTEGER,
     "description" TEXT,
-    "isComunero" BOOLEAN NOT NULL DEFAULT true,
     "destination" TEXT,
     "requestDescription" TEXT,
     "sectorLocation" TEXT,
-    "clientSearchType" TEXT,
-    "clientFullName" TEXT,
-    "clientDocumentNumber" TEXT,
-    "clientAddress" TEXT,
-    "partnerSearchType" TEXT,
-    "partnerFullName" TEXT,
-    "partnerDocumentNumber" TEXT,
-    "partnerAddress" TEXT,
     "certificateTypes" JSONB,
     "exposure" TEXT,
     "attachments" JSONB,
-    "createdByDni" TEXT,
-    "createdByRole" TEXT,
     "status" "public"."RequestStatus" NOT NULL DEFAULT 'Pendiente',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -123,18 +112,23 @@ CREATE TABLE "public"."CertificateRequest" (
 -- CreateTable
 CREATE TABLE "public"."Certificate" (
     "id" SERIAL NOT NULL,
-    "code" TEXT NOT NULL,
-    "correlative" INTEGER NOT NULL,
+    "certificateNumber" TEXT NOT NULL,
+    "requestNumber" TEXT NOT NULL,
     "clientId" INTEGER NOT NULL,
-    "requestId" INTEGER,
-    "sectorId" INTEGER,
-    "terrainTypeId" INTEGER,
-    "location" TEXT,
+    "partnerId" INTEGER,
+    "sectorId" INTEGER NOT NULL,
+    "terrainTypeId" INTEGER NOT NULL,
+    "userId" INTEGER NOT NULL,
+    "width" DECIMAL(10,2),
+    "length" DECIMAL(10,2),
+    "totalArea" DECIMAL(10,2),
     "mz" TEXT,
     "lot" TEXT,
+    "north" TEXT,
+    "south" TEXT,
+    "east" TEXT,
+    "west" TEXT,
     "status" "public"."CertificateStatus" NOT NULL DEFAULT 'PorFirmar',
-    "issuedAt" TIMESTAMP(3),
-    "deliveredAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -181,19 +175,10 @@ CREATE UNIQUE INDEX "TerrainType_name_key" ON "public"."TerrainType"("name");
 CREATE UNIQUE INDEX "Client_documentNumber_key" ON "public"."Client"("documentNumber");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "CertificateRequest_code_key" ON "public"."CertificateRequest"("code");
-
--- CreateIndex
 CREATE UNIQUE INDEX "CertificateRequest_requestNumber_key" ON "public"."CertificateRequest"("requestNumber");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Certificate_code_key" ON "public"."Certificate"("code");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Certificate_correlative_key" ON "public"."Certificate"("correlative");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Certificate_requestId_key" ON "public"."Certificate"("requestId");
+CREATE UNIQUE INDEX "Certificate_certificateNumber_key" ON "public"."Certificate"("certificateNumber");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "AssemblyRecordRequest_code_key" ON "public"."AssemblyRecordRequest"("code");
@@ -214,16 +199,22 @@ ALTER TABLE "public"."CertificateRequest" ADD CONSTRAINT "CertificateRequest_cli
 ALTER TABLE "public"."CertificateRequest" ADD CONSTRAINT "CertificateRequest_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "public"."CertificateRequest" ADD CONSTRAINT "CertificateRequest_partnerId_fkey" FOREIGN KEY ("partnerId") REFERENCES "public"."Client"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "public"."Certificate" ADD CONSTRAINT "Certificate_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "public"."Client"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."Certificate" ADD CONSTRAINT "Certificate_requestId_fkey" FOREIGN KEY ("requestId") REFERENCES "public"."CertificateRequest"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "public"."Certificate" ADD CONSTRAINT "Certificate_partnerId_fkey" FOREIGN KEY ("partnerId") REFERENCES "public"."Client"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."Certificate" ADD CONSTRAINT "Certificate_sectorId_fkey" FOREIGN KEY ("sectorId") REFERENCES "public"."Sector"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "public"."Certificate" ADD CONSTRAINT "Certificate_sectorId_fkey" FOREIGN KEY ("sectorId") REFERENCES "public"."Sector"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."Certificate" ADD CONSTRAINT "Certificate_terrainTypeId_fkey" FOREIGN KEY ("terrainTypeId") REFERENCES "public"."TerrainType"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "public"."Certificate" ADD CONSTRAINT "Certificate_terrainTypeId_fkey" FOREIGN KEY ("terrainTypeId") REFERENCES "public"."TerrainType"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Certificate" ADD CONSTRAINT "Certificate_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."AssemblyRecordRequest" ADD CONSTRAINT "AssemblyRecordRequest_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "public"."Client"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

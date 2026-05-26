@@ -55,9 +55,9 @@ const previewAssemblyRecordRequest = asyncHandler(async (req, res) => {
   res.json({
     code: request.code,
     client: request.client.fullName,
-    certificateCode: request.certificate.code,
+    certificateNumber: request.certificate.certificateNumber,
     status: request.status,
-    preview: `Solicitud ${request.code} basada en certificado ${request.certificate.code}`,
+    preview: `Solicitud ${request.code} basada en certificado ${request.certificate.certificateNumber}`,
   });
 });
 

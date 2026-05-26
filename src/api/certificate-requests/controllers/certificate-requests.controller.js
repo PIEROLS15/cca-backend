@@ -17,7 +17,7 @@ const listCertificateRequests = asyncHandler(async (req, res) => {
 });
 
 const getCertificateRequestById = asyncHandler(async (req, res) => {
-  const request = await certificateRequestsService.getCertificateRequestById(Number(req.params.id));
+  const request = await certificateRequestsService.getCertificateRequestById(req.params.id);
   res.json(request);
 });
 
@@ -47,7 +47,7 @@ const deleteCertificateRequest = asyncHandler(async (req, res) => {
 });
 
 const downloadCertificateRequestPdf = asyncHandler(async (req, res) => {
-  const request = await certificateRequestsService.getCertificateRequestById(Number(req.params.id));
+  const request = await certificateRequestsService.getCertificateRequestById(req.params.id);
   const pdfBuffer = await buildCertificateRequestPdf(request);
 
   res.setHeader("Content-Type", "application/pdf");

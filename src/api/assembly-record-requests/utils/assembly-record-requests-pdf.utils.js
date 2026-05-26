@@ -6,7 +6,7 @@ const buildAssemblyRecordRequestPdf = async (request) => {
     { label: "Estado", value: request.status },
     { label: "Cliente", value: request.client?.fullName },
     { label: "Documento", value: request.client?.documentNumber },
-    { label: "Certificado asociado", value: request.certificate?.code },
+    { label: "Certificado asociado", value: request.certificate?.certificateNumber },
     { label: "Usuario", value: request.user?.fullName },
     { label: "Descripcion", value: request.description },
     { label: "Fecha de registro", value: request.createdAt },

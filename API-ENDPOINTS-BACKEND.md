@@ -271,11 +271,15 @@ Query opcional adicional:
 
 ### GET `/api/certificate-requests/:id`
 
+Acepta tanto el `id` numerico como el `requestNumber` (ej: `000001` o `000001-26`).
+
 ### GET `/api/certificate-requests/:id/pdf`
 
 ### POST `/api/certificate-requests`
 
 El cliente titular se toma desde el objeto `client` del body.
+Si se envia `partnerClient` con datos, se registra como partner y se almacena su `partnerId`.
+`isComunero` determina el `clientType`: `true` -> `Comunero`, `false` -> `Tercero`.
 El campo `createdBy` se completa automaticamente con el usuario autenticado que realiza el registro.
 
 ```json
@@ -392,35 +396,47 @@ Estructura de respuesta de `GET /api/certificate-requests/:id`:
 
 Filtros opcionales:
 
-- `code`
-- `name` (nombre de cliente)
-- `documentNumber`
-- `location`
-- `mz`
-- `lot`
-- `requestCode`
-- `status=PorFirmar|PorRecoger|Entregado`
+- `certificateNumber` — busqueda parcial del numero de certificado
+- `requestNumber` — busqueda por numero de solicitud asociado
+- `name` — nombre del propietario (busca en cliente y partner)
+- `documentNumber` — DNI del propietario (busca en cliente y partner)
+- `mz` — manzana
+- `lot` — lote
+- `status=Por Firmar|Por Recoger|Entregado`
+- `sectorId` — ID del sector
+- `terrainTypeId` — ID del tipo de terreno
 
 ### GET `/api/certificates/:id`
-
-### GET `/api/certificates/:id/preview`
 
 ### GET `/api/certificates/:id/pdf`
 
 ### POST `/api/certificates`
 
+`owners` es un array de objetos con `id` del cliente. El primer elemento es el propietario principal (`clientId`), el segundo (opcional) es el conyuge/partner (`partnerId`).
+`requestNumber` debe corresponder a una solicitud de certificado existente.
+`createdBy` se asigna automaticamente desde el token JWT.
+
 ```json
 {
-  "clientId": 1,
-  "requestId": 1,
-  "sectorId": 1,
-  "terrainTypeId": 1,
-  "location": "Zona A",
-  "mz": "MZ-01",
-  "lot": "L-10",
-  "status": "PorFirmar",
-  "issuedAt": "2026-05-16T00:00:00.000Z",
-  "deliveredAt": null
+  "owners": [{ "id": 1 }, { "id": 2 }],
+  "terrain": {
+    "terrainType": { "id": 1 },
+    "width": 10.5,
+    "length": 20.0,
+    "totalArea": 210.0
+  },
+  "location": {
+    "sectors": { "id": 1 },
+    "mz": "L-2",
+    "lot": "7"
+  },
+  "borders": {
+    "north": "LOTE 6",
+    "south": "LOTE 8",
+    "east": "LOTE 5",
+    "west": "CALLE FRANCISCO AVALOS"
+  },
+  "requestNumber": "003223-26"
 }
 ```
 
@@ -428,14 +444,77 @@ Filtros opcionales:
 
 ```json
 {
-  "sectorId": 1,
-  "terrainTypeId": 1,
-  "location": "Zona B",
-  "mz": "MZ-02",
-  "lot": "L-20",
-  "status": "PorRecoger",
-  "issuedAt": "2026-05-16T00:00:00.000Z",
-  "deliveredAt": null
+  "owners": [{ "id": 1 }],
+  "terrain": {
+    "terrainType": { "id": 1 },
+    "width": 12.0,
+    "length": 25.0,
+    "totalArea": 300.0
+  },
+  "location": {
+    "sectors": { "id": 2 },
+    "mz": "MZ-1",
+    "lot": "L-5"
+  },
+  "borders": {
+    "north": "CALLE LOS OLIVOS",
+    "south": "LOTE 3",
+    "east": "LOTE 4",
+    "west": "AV. PRINCIPAL"
+  },
+  "status": "Por Recoger"
+}
+```
+
+Estructura de respuesta de `GET /api/certificates/:id`:
+
+```json
+{
+  "id": 1,
+  "owners": [
+    {
+      "id": 1,
+      "fullName": "LUZ SELENE PALOMINO ALVAREZ",
+      "documentNumber": "30422693"
+    },
+    {
+      "id": 2,
+      "fullName": "CESAR AUGUSTO BARDALES ASTE",
+      "documentNumber": "42538515"
+    }
+  ],
+  "terrain": {
+    "terrainType": {
+      "id": 1,
+      "name": "VIVIENDA"
+    },
+    "width": 10.5,
+    "length": 20.0,
+    "totalArea": 210.0
+  },
+  "location": {
+    "sectors": {
+      "id": 1,
+      "name": "VIGARAY"
+    },
+    "mz": "L-2",
+    "lot": "7"
+  },
+  "borders": {
+    "north": "LOTE 6",
+    "south": "LOTE 8",
+    "east": "LOTE 5",
+    "west": "CALLE FRANCISCO AVALOS"
+  },
+  "certificateNumber": "000001",
+  "requestNumber": "003223-26",
+  "status": "Entregado",
+  "createdBy": {
+    "dni": "00000258",
+    "role": "ATENCION"
+  },
+  "createdAt": "2026-05-19T20:35:20Z",
+  "updatedAt": "2026-05-19T20:35:20Z"
 }
 ```
 
@@ -493,12 +572,12 @@ Devuelve totales de:
 
 Exporta Excel (`.xlsx`) y acepta los mismos filtros que `GET /api/certificates`:
 
-- `code`, `name`, `documentNumber`, `location`, `mz`, `lot`, `requestCode`, `status`
+- `certificateNumber`, `requestNumber`, `name`, `documentNumber`, `mz`, `lot`, `status`
 
 ## Valores permitidos (enums)
 
 - `clientType`: `Comunero`, `Tercero`
-- `certificate status`: `PorFirmar`, `PorRecoger`, `Entregado`
+- `certificate status`: `Por Firmar`, `Por Recoger`, `Entregado`
 - `request status`: `Pendiente`, `Aprobada`, `Rechazada`
 
 ## Roles base que se crean automaticamente
@@ -510,11 +589,10 @@ Exporta Excel (`.xlsx`) y acepta los mismos filtros que `GET /api/certificates`:
 ## Orden recomendado para pruebas 1 a 1
 
 1. `POST /api/auth/login` (guardar token)
-2. Crear usuarios con `POST /api/users`
-3. Crear roles (`/api/roles`) si necesitas roles nuevos
-4. Crear catalogos: sectors + terrain-types
-5. Crear clients
-6. Crear certificate-requests
-7. Crear certificates
-8. Crear assembly-record-requests
-9. Probar previews/pdf/reportes/dashboard
+2. `POST /api/users` (crear usuario, publico)
+3. Crear catalogos: sectors + terrain-types
+4. Crear clients
+5. Crear certificate-requests
+6. Crear certificates
+7. Crear assembly-record-requests
+8. Probar previews/pdf/reportes/dashboard

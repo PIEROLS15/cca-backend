@@ -9,7 +9,9 @@ const exportCertificatesReport = async (query) => {
     where,
     include: {
       client: true,
-      request: true,
+      partner: true,
+      sector: true,
+      terrainType: true,
     },
     orderBy: { id: "desc" },
   });
