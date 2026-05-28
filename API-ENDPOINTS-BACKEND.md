@@ -117,6 +117,84 @@ Requiere autenticacion. Valida el token JWT y devuelve los datos del usuario aut
 }
 ```
 
+### PATCH `/api/auth/profile`
+
+Requiere autenticacion. Actualiza los datos personales del usuario autenticado.
+
+Body:
+
+```json
+{
+  "fullName": "Piero Llanos Sanchez",
+  "username": "pierols",
+  "email": "piero@correo.com"
+}
+```
+
+Respuesta:
+
+```json
+{
+  "user": {
+    "id": 1,
+    "username": "pierols",
+    "fullName": "Piero Llanos Sanchez",
+    "email": "piero@correo.com",
+    "dni": "73171545",
+    "isActive": true,
+    "role": {
+      "id": 1,
+      "name": "Admin",
+      "description": "Acceso total al sistema",
+      "permissions": []
+    },
+    "createdAt": "2026-05-18T23:55:52.452Z",
+    "updatedAt": "2026-05-18T23:55:52.452Z"
+  }
+}
+```
+
+### POST `/api/auth/change-password`
+
+Requiere autenticacion. Cambia la contraseña del usuario autenticado. Requiere verificar la contraseña actual.
+
+Body:
+
+```json
+{
+  "currentPassword": "123456",
+  "newPassword": "nueva-clave-segura"
+}
+```
+
+Respuesta:
+
+```json
+{
+  "message": "Contraseña actualizada correctamente"
+}
+```
+
+### POST `/api/auth/verify-password`
+
+Requiere autenticacion. Verifica que la contraseña actual sea correcta (util para el flujo de cambio de contraseña en dos pasos desde el frontend).
+
+Body:
+
+```json
+{
+  "password": "123456"
+}
+```
+
+Respuesta:
+
+```json
+{
+  "message": "Contraseña verificada correctamente"
+}
+```
+
 ## 2) Roles
 
 ### GET `/api/roles?page=1&limit=10`
