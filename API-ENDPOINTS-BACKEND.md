@@ -92,6 +92,31 @@ Requiere autenticacion (token en cookie o Authorization header). Limpia la cooki
 }
 ```
 
+### GET `/api/auth/me`
+
+Requiere autenticacion. Valida el token JWT y devuelve los datos del usuario autenticado. Util para verificar si la sesion sigue activa desde el frontend.
+
+```json
+{
+  "user": {
+    "id": 1,
+    "username": "admin",
+    "fullName": "Admin",
+    "email": "admin@correo.com",
+    "dni": "00000258",
+    "isActive": true,
+    "role": {
+      "id": 1,
+      "name": "Admin",
+      "description": "Acceso total al sistema",
+      "permissions": []
+    },
+    "createdAt": "2026-05-18T23:55:52.452Z",
+    "updatedAt": "2026-05-18T23:55:52.452Z"
+  }
+}
+```
+
 ## 2) Roles
 
 ### GET `/api/roles?page=1&limit=10`

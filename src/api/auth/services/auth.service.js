@@ -4,6 +4,27 @@ const HttpError = require("../../../utils/http-error");
 const { withRoleInclude } = require("../../../utils/role.utils");
 const { createAccessToken, sanitizeUser } = require("../utils/auth.utils");
 
+const me = async (userId) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      role: {
+        include: withRoleInclude,
+      },
+    },
+  });
+
+  if (!user) {
+    throw new HttpError(401, "Usuario no encontrado");
+  }
+
+  if (user.isActive === false) {
+    throw new HttpError(403, "Usuario inactivo");
+  }
+
+  return sanitizeUser(user);
+};
+
 const login = async ({ username, password }) => {
   const user = await prisma.user.findUnique({
     where: { username },
@@ -37,4 +58,5 @@ const login = async ({ username, password }) => {
 
 module.exports = {
   login,
+  me,
 };

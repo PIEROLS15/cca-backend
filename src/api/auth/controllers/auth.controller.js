@@ -20,6 +20,11 @@ const login = asyncHandler(async (req, res) => {
   res.json({ user: result.user });
 });
 
+const me = asyncHandler(async (req, res) => {
+  const user = await authService.me(req.user.sub);
+  res.json({ user });
+});
+
 const logout = asyncHandler(async (req, res) => {
   res.clearCookie("token", {
     httpOnly: true,
@@ -31,5 +36,6 @@ const logout = asyncHandler(async (req, res) => {
 
 module.exports = {
   login,
+  me,
   logout,
 };
