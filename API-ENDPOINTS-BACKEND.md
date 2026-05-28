@@ -600,6 +600,60 @@ Devuelve totales de:
 - terrainTypes
 - sectors
 
+### GET `/api/dashboard/status-breakdown`
+
+Devuelve conteo de certificados agrupados por estado (`PorFirmar`, `PorRecoger`, `Entregado`), cada uno con su color.
+
+Query params opcionales:
+
+- `from=YYYY-MM-DD` — filtrar desde esta fecha (inicio del dia UTC)
+- `to=YYYY-MM-DD` — filtrar hasta esta fecha (fin del dia UTC)
+
+Respuesta:
+
+```json
+[
+  { "name": "Por firmar", "value": 5, "color": "oklch(0.6 0.22 25)" },
+  { "name": "Por recoger", "value": 3, "color": "oklch(0.78 0.16 75)" },
+  { "name": "Entregado", "value": 12, "color": "oklch(0.65 0.16 155)" }
+]
+```
+
+### GET `/api/dashboard/monthly-activity`
+
+Devuelve certificados, solicitudes de certificados y solicitudes de acta agrupados por mes.
+
+Query params opcionales:
+
+- `from=YYYY-MM-DD` — filtrar desde esta fecha
+- `to=YYYY-MM-DD` — filtrar hasta esta fecha
+
+Respuesta:
+
+```json
+[
+  { "mes": "Ene", "certificados": 120, "solicitudesCert": 60, "solicitudesActa": 25 },
+  { "mes": "Feb", "certificados": 145, "solicitudesCert": 71, "solicitudesActa": 30 }
+]
+```
+
+### GET `/api/dashboard/recent-activity`
+
+Devuelve las ultimas 5 actividades (mezcla de certificados creados, solicitudes registradas y actas solicitadas), ordenadas por fecha descendente.
+
+Respuesta:
+
+```json
+[
+  {
+    "id": "cert-1",
+    "usuario": "Admin",
+    "accion": "generó el certificado 000001 para LUZ SELENE PALOMINO ALVAREZ",
+    "cuando": "2026-05-19T20:35:20.000Z"
+  }
+]
+```
+
 ## 11) Reports
 
 ### GET `/api/reports/certificates`
