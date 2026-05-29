@@ -11,7 +11,8 @@ Este documento lista los endpoints del backend para probarlos uno por uno.
 ## Autenticacion
 
 Todos los endpoints (excepto `/health` y `/api/auth/login`) requieren autenticacion.
-El token JWT se obtiene via `POST /api/auth/login` y se almacena automaticamente en una cookie httpOnly (`token`).
+El token JWT se genera via `POST /api/auth/login` y se almacena automaticamente en una cookie httpOnly (`token`).
+El endpoint de login no devuelve el token en el JSON de respuesta.
 
 Alternativamente, se puede usar el header:
 
@@ -59,7 +60,7 @@ Body:
 }
 ```
 
-Respuesta: setea una cookie httpOnly `token` con el JWT. Devuelve los datos del usuario:
+Respuesta: setea una cookie httpOnly `token` con el JWT. Devuelve solo los datos del usuario:
 
 ```json
 {
@@ -370,9 +371,34 @@ Query opcional adicional:
 - `clientType=Comunero`
 - `clientType=Tercero`
 
+Observaciones:
+
+- `nro_licence` se devuelve solo cuando el cliente es `Comunero`
+- el correlativo de `nro_licence` se asigna automaticamente en backend
+- no se envía `nro_licence` en `POST` ni en `PUT`
+
 ### GET `/api/clients/:id`
 
+Ejemplo de respuesta:
+
+```json
+{
+  "id": 1,
+  "fullName": "Arias Aburto, Olga Lidia",
+  "documentNumber": "80093634",
+  "address": "Asia",
+  "phone": null,
+  "clientType": "Comunero",
+  "nro_licence": "0001",
+  "createdAt": "2026-05-25T23:46:15.722Z",
+  "updatedAt": "2026-05-25T23:46:15.722Z"
+}
+```
+
 ### POST `/api/clients`
+
+Si `clientType` es `Comunero`, el backend asigna automaticamente el siguiente `nro_licence`.
+Si `clientType` es `Tercero`, `nro_licence` queda `null`.
 
 ```json
 {
@@ -385,6 +411,9 @@ Query opcional adicional:
 ```
 
 ### PUT `/api/clients/:id`
+
+Si un cliente `Tercero` pasa a `Comunero`, el backend asigna automaticamente el siguiente `nro_licence` disponible.
+Si un cliente `Comunero` pasa a `Tercero`, el sistema conserva la secuencia internamente por trazabilidad, pero la respuesta devuelve `nro_licence: null` mientras siga siendo `Tercero`.
 
 ```json
 {
@@ -418,6 +447,8 @@ El cliente titular se toma desde el objeto `client` del body.
 Si se envia `partnerClient` con datos, se registra como partner y se almacena su `partnerId`.
 `isComunero` determina el `clientType`: `true` -> `Comunero`, `false` -> `Tercero`.
 El campo `createdBy` se completa automaticamente con el usuario autenticado que realiza el registro.
+Si `isComunero=true`, el backend asigna automaticamente `nro_licence` al cliente si todavia no tiene uno.
+La misma regla aplica cuando el cliente se crea o actualiza indirectamente desde solicitudes.
 
 ```json
 {
@@ -429,13 +460,15 @@ El campo `createdBy` se completa automaticamente con el usuario autenticado que 
     "searchType": "Reniec",
     "fullName": "Arias Aburto, Olga Lidia",
     "documentNumber": "80093634",
-    "address": "Asia"
+    "address": "Asia",
+    "nro_licence": "0001"
   },
   "partnerClient": {
     "searchType": "Comunidad",
     "fullName": "",
     "documentNumber": "",
-    "address": ""
+    "address": "",
+    "nro_licence": null
   },
   "certificateTypes": [
     {
@@ -486,13 +519,15 @@ Estructura de respuesta de `GET /api/certificate-requests/:id`:
     "searchType": "Reniec",
     "fullName": "Arias Aburto, Olga Lidia",
     "documentNumber": "80093634",
-    "address": "Asia"
+    "address": "Asia",
+    "nro_licence": "0001"
   },
   "partnerClient": {
     "searchType": "Comunidad",
     "fullName": "",
     "documentNumber": "",
-    "address": ""
+    "address": "",
+    "nro_licence": null
   },
   "certificateTypes": [
     {
@@ -779,7 +814,7 @@ Exporta Excel (`.xlsx`) y acepta los mismos filtros que `GET /api/certificates`:
 
 ## Orden recomendado para pruebas 1 a 1
 
-1. `POST /api/auth/login` (guardar token)
+1. `POST /api/auth/login` (guardar cookie `token` o reutilizarla en Postman)
 2. `POST /api/users` (crear usuario, publico)
 3. Crear catalogos: sectors + terrain-types
 4. Crear clients

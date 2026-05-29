@@ -1,3 +1,5 @@
+const { formatClientResponse } = require("../../clients/utils/clients.utils");
+
 const buildRequestNumber = (sequence, date = new Date()) => {
   const year = String(date.getFullYear()).slice(-2);
   return `${String(sequence).padStart(6, "0")}-${year}`;
@@ -29,8 +31,8 @@ const normalizeAttachments = (items = []) =>
   }));
 
 const formatCertificateRequestResponse = (request) => {
-  const client = request.client || {};
-  const partner = request.partner || {};
+  const client = formatClientResponse(request.client || {}) || {};
+  const partner = formatClientResponse(request.partner || {}) || {};
   const user = request.user || {};
 
   return {
@@ -46,12 +48,14 @@ const formatCertificateRequestResponse = (request) => {
       fullName: client.fullName || "",
       documentNumber: client.documentNumber || "",
       address: client.address || "",
+      nro_licence: client.nro_licence || null,
     },
     partnerClient: {
       searchType: partner.id ? "Reniec" : "",
       fullName: partner.fullName || "",
       documentNumber: partner.documentNumber || "",
       address: partner.address || "",
+      nro_licence: partner.nro_licence || null,
     },
     certificateTypes: Array.isArray(request.certificateTypes) ? request.certificateTypes : [],
     exposure: request.exposure || "",

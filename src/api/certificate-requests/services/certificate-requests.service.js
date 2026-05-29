@@ -7,6 +7,7 @@ const {
   normalizeAttachments,
   formatCertificateRequestResponse,
 } = require("../utils/certificate-requests.utils");
+const clientsService = require("../../clients/services/clients.service");
 
 const requestIncludes = {
   client: true,
@@ -101,20 +102,11 @@ const createCertificateRequest = async (payload, userId) => {
   const isComunero = typeof payload.isComunero === "boolean" ? payload.isComunero : true;
   const clientType = isComunero ? "Comunero" : "Tercero";
 
-  const client = await prisma.client.upsert({
-    where: { documentNumber },
-    update: {
-      fullName,
-      address: clientSnapshot.address || undefined,
-      clientType,
-    },
-    create: {
-      fullName,
-      documentNumber,
-      address: clientSnapshot.address || null,
-      phone: null,
-      clientType,
-    },
+  const client = await clientsService.upsertClientByDocument(documentNumber, {
+    fullName,
+    address: clientSnapshot.address || null,
+    phone: null,
+    clientType,
   });
 
   let partnerId = null;
@@ -125,20 +117,11 @@ const createCertificateRequest = async (payload, userId) => {
     const partnerName = String(partnerClient.fullName || "").trim();
 
     if (partnerDoc && partnerName) {
-      const partner = await prisma.client.upsert({
-        where: { documentNumber: partnerDoc },
-        update: {
-          fullName: partnerName,
-          address: partnerClient.address || undefined,
-          clientType: "Tercero",
-        },
-        create: {
-          fullName: partnerName,
-          documentNumber: partnerDoc,
-          address: partnerClient.address || null,
-          phone: null,
-          clientType: "Tercero",
-        },
+      const partner = await clientsService.upsertClientByDocument(partnerDoc, {
+        fullName: partnerName,
+        address: partnerClient.address || null,
+        phone: null,
+        clientType: "Tercero",
       });
       partnerId = partner.id;
     }
@@ -185,10 +168,11 @@ const updateCertificateRequest = async (id, payload) => {
       const isComunero = typeof payload.isComunero === "boolean" ? payload.isComunero : current.client?.clientType === "Comunero";
       const clientType = isComunero ? "Comunero" : "Tercero";
 
-      const updatedClient = await prisma.client.upsert({
-        where: { documentNumber: doc },
-        update: { fullName: name, address: clientSnapshot.address || undefined, clientType },
-        create: { fullName: name, documentNumber: doc, address: clientSnapshot.address || null, phone: null, clientType },
+      const updatedClient = await clientsService.upsertClientByDocument(doc, {
+        fullName: name,
+        address: clientSnapshot.address || null,
+        phone: null,
+        clientType,
       });
       data.clientId = updatedClient.id;
     }
@@ -201,10 +185,11 @@ const updateCertificateRequest = async (id, payload) => {
     const partnerName = String(partnerClient.fullName || "").trim();
 
     if (partnerDoc && partnerName) {
-      const partner = await prisma.client.upsert({
-        where: { documentNumber: partnerDoc },
-        update: { fullName: partnerName, address: partnerClient.address || undefined, clientType: "Tercero" },
-        create: { fullName: partnerName, documentNumber: partnerDoc, address: partnerClient.address || null, phone: null, clientType: "Tercero" },
+      const partner = await clientsService.upsertClientByDocument(partnerDoc, {
+        fullName: partnerName,
+        address: partnerClient.address || null,
+        phone: null,
+        clientType: "Tercero",
       });
       data.partnerId = partner.id;
     } else {

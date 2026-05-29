@@ -1,7 +1,52 @@
+const { Prisma } = require("@prisma/client");
 const prisma = require("../../../config/prisma");
 const HttpError = require("../../../utils/http-error");
 const { buildPaginationResult, getPaginationParams } = require("../../../utils/pagination");
-const { normalizeClientPayload } = require("../utils/clients.utils");
+const {
+  buildClientWriteData,
+  formatClientCollection,
+  formatClientResponse,
+} = require("../utils/clients.utils");
+
+const MAX_LICENSE_RETRIES = 3;
+
+const isLicenseRaceError = (error) => {
+  if (error?.code === "P2034") {
+    return true;
+  }
+
+  return error?.code === "P2002"
+    && Array.isArray(error?.meta?.target)
+    && error.meta.target.includes("licenseSequence");
+};
+
+const runClientWriteTransaction = async (handler) => {
+  let attempt = 0;
+
+  while (attempt < MAX_LICENSE_RETRIES) {
+    try {
+      return await prisma.$transaction(
+        async (tx) => handler(tx),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      attempt += 1;
+
+      if (!isLicenseRaceError(error) || attempt >= MAX_LICENSE_RETRIES) {
+        throw error;
+      }
+    }
+  }
+};
+
+const getClientRecordById = async (id, db = prisma) => {
+  const client = await db.client.findUnique({ where: { id } });
+  if (!client) {
+    throw new HttpError(404, "Cliente no encontrado");
+  }
+
+  return client;
+};
 
 const listClients = async ({ clientType, page, limit }) => {
   const pagination = getPaginationParams({ page, limit });
@@ -21,7 +66,7 @@ const listClients = async ({ clientType, page, limit }) => {
   ]);
 
   return buildPaginationResult({
-    docs,
+    docs: formatClientCollection(docs),
     total,
     page: pagination.page,
     limit: pagination.limit,
@@ -29,29 +74,60 @@ const listClients = async ({ clientType, page, limit }) => {
 };
 
 const getClientById = async (id) => {
-  const client = await prisma.client.findUnique({ where: { id } });
-  if (!client) {
-    throw new HttpError(404, "Cliente no encontrado");
-  }
-  return client;
+  return formatClientResponse(await getClientRecordById(id));
 };
 
 const createClient = async (payload) => {
-  return prisma.client.create({
-    data: normalizeClientPayload(payload),
+  return runClientWriteTransaction(async (tx) => {
+    const data = await buildClientWriteData(tx, payload);
+    const client = await tx.client.create({
+      data,
+    });
+
+    return formatClientResponse(client);
   });
 };
 
 const updateClient = async (id, payload) => {
-  await getClientById(id);
-  return prisma.client.update({
-    where: { id },
-    data: normalizeClientPayload(payload),
+  return runClientWriteTransaction(async (tx) => {
+    const currentClient = await getClientRecordById(id, tx);
+    const data = await buildClientWriteData(tx, payload, currentClient);
+    const client = await tx.client.update({
+      where: { id },
+      data,
+    });
+
+    return formatClientResponse(client);
+  });
+};
+
+const upsertClientByDocument = async (documentNumber, payload) => {
+  return runClientWriteTransaction(async (tx) => {
+    const currentClient = await tx.client.findUnique({
+      where: { documentNumber },
+    });
+
+    const data = await buildClientWriteData(
+      tx,
+      { ...payload, documentNumber },
+      currentClient,
+    );
+
+    if (currentClient) {
+      return tx.client.update({
+        where: { id: currentClient.id },
+        data,
+      });
+    }
+
+    return tx.client.create({
+      data,
+    });
   });
 };
 
 const deleteClient = async (id) => {
-  await getClientById(id);
+  await getClientRecordById(id);
 
   const requestsCount = await prisma.certificateRequest.count({ where: { clientId: id } });
   if (requestsCount > 0) {
@@ -66,5 +142,6 @@ module.exports = {
   getClientById,
   createClient,
   updateClient,
+  upsertClientByDocument,
   deleteClient,
 };

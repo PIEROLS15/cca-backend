@@ -82,6 +82,7 @@ CREATE TABLE "public"."Client" (
     "address" TEXT,
     "phone" TEXT,
     "clientType" "public"."ClientType" NOT NULL,
+    "licenseSequence" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -173,6 +174,9 @@ CREATE UNIQUE INDEX "TerrainType_name_key" ON "public"."TerrainType"("name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Client_documentNumber_key" ON "public"."Client"("documentNumber");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Client_licenseSequence_key" ON "public"."Client"("licenseSequence");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "CertificateRequest_requestNumber_key" ON "public"."CertificateRequest"("requestNumber");
