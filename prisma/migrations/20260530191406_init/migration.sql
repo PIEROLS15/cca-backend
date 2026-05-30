@@ -103,7 +103,6 @@ CREATE TABLE "public"."CertificateRequest" (
     "certificateTypes" JSONB,
     "exposure" TEXT,
     "attachments" JSONB,
-    "status" "public"."RequestStatus" NOT NULL DEFAULT 'Pendiente',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

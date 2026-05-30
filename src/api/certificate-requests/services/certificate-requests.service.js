@@ -25,22 +25,17 @@ const nextRequestNumber = async () => {
   return buildRequestNumber(nextSequence);
 };
 
-const listCertificateRequests = async ({ status, page, limit }) => {
+const listCertificateRequests = async ({ page, limit }) => {
   const pagination = getPaginationParams({ page, limit });
-
-  const where = {
-    status: status || undefined,
-  };
 
   const [docs, total] = await Promise.all([
     prisma.certificateRequest.findMany({
-      where,
       include: requestIncludes,
-      orderBy: { id: "desc" },
+      orderBy: { createdAt: "desc" },
       skip: pagination.skip,
       take: pagination.limit,
     }),
-    prisma.certificateRequest.count({ where }),
+    prisma.certificateRequest.count(),
   ]);
 
   return buildPaginationResult({
@@ -202,7 +197,6 @@ const updateCertificateRequest = async (id, payload) => {
   if (payload.destination !== undefined) data.destination = payload.destination;
   if (payload.sectorLocation !== undefined) data.sectorLocation = payload.sectorLocation;
   if (payload.exposure !== undefined) data.exposure = payload.exposure;
-  if (payload.status !== undefined) data.status = payload.status;
   if (payload.certificateTypes !== undefined) data.certificateTypes = normalizeCertificateTypes(payload.certificateTypes);
   if (payload.attachments !== undefined) data.attachments = normalizeAttachments(payload.attachments);
 

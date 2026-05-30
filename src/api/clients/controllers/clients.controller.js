@@ -2,6 +2,7 @@ const asyncHandler = require("../../../utils/async-handler");
 const HttpError = require("../../../utils/http-error");
 const { sendSuccess } = require("../../../utils/api-response");
 const clientsService = require("../services/clients.service");
+const reniecService = require("../services/reniec.service");
 
 const listClients = asyncHandler(async (req, res) => {
   const data = await clientsService.listClients({
@@ -40,10 +41,34 @@ const deleteClient = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
+const searchByDocument = asyncHandler(async (req, res) => {
+  const { document } = req.params;
+
+  if (!document || document.length < 3) {
+    throw new HttpError(400, "Ingrese al menos 3 caracteres para buscar");
+  }
+
+  const client = await clientsService.searchByDocument(document);
+  res.json(client);
+});
+
+const searchReniec = asyncHandler(async (req, res) => {
+  const { document } = req.params;
+
+  if (!document || document.length < 8) {
+    throw new HttpError(400, "Ingrese un DNI válido (8 dígitos)");
+  }
+
+  const person = await reniecService.searchByDocument(document);
+  res.json(person);
+});
+
 module.exports = {
   listClients,
   getClientById,
   createClient,
   updateClient,
   deleteClient,
+  searchByDocument,
+  searchReniec,
 };

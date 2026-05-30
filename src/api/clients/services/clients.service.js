@@ -137,6 +137,18 @@ const deleteClient = async (id) => {
   await prisma.client.delete({ where: { id } });
 };
 
+const searchByDocument = async (document) => {
+  const client = await prisma.client.findFirst({
+    where: { documentNumber: { contains: document } },
+  });
+
+  if (!client) {
+    throw new HttpError(404, "No se encontró ningún cliente con ese documento");
+  }
+
+  return formatClientResponse(client);
+};
+
 module.exports = {
   listClients,
   getClientById,
@@ -144,4 +156,5 @@ module.exports = {
   updateClient,
   upsertClientByDocument,
   deleteClient,
+  searchByDocument,
 };
