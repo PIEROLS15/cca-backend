@@ -10,8 +10,14 @@ const normalizeValueToken = (value) => {
     return "";
   }
 
-  return String(value)
-    .trim()
+  const trimmed = String(value).trim();
+  const hasSeparator = /[_\s-]/.test(trimmed);
+
+  if (!hasSeparator) {
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  }
+
+  return trimmed
     .split(/[_\s-]+/)
     .filter(Boolean)
     .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1).toLowerCase())
@@ -40,7 +46,6 @@ const formatCertificateRequestResponse = (request) => {
     requestNumber: request.requestNumber,
     isComunero: client.clientType === "Comunero",
     destination: request.destination || "",
-    status: request.status,
     requestDescription: request.requestDescription || request.description || "",
     sectorLocation: request.sectorLocation || "",
     client: {

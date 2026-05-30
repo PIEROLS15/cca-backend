@@ -6,7 +6,6 @@ const { buildCertificateRequestPdf } = require("../utils/certificate-requests-pd
 
 const listCertificateRequests = asyncHandler(async (req, res) => {
   const data = await certificateRequestsService.listCertificateRequests({
-    status: req.query.status,
     page: req.query.page,
     limit: req.query.limit,
   });
@@ -47,13 +46,15 @@ const deleteCertificateRequest = asyncHandler(async (req, res) => {
 });
 
 const downloadCertificateRequestPdf = asyncHandler(async (req, res) => {
-  const request = await certificateRequestsService.getCertificateRequestById(req.params.id);
+  const filename = req.params.filename || "";
+  const requestNumber = filename.replace(/^solicitud-certificado-/, "").replace(/\.pdf$/, "");
+  const request = await certificateRequestsService.getCertificateRequestById(requestNumber);
   const pdfBuffer = await buildCertificateRequestPdf(request);
 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
     "Content-Disposition",
-    `attachment; filename="solicitud-certificado-${request.requestNumber}.pdf"`
+    `inline; filename="${filename}"`
   );
   res.send(pdfBuffer);
 });

@@ -124,7 +124,6 @@ model CertificateRequest {
   certificateTypes   Json?
   exposure           String?
   attachments        Json?
-  status             RequestStatus @default(Pendiente)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
