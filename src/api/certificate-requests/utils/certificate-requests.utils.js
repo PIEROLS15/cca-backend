@@ -49,6 +49,7 @@ const formatCertificateRequestResponse = (request) => {
     requestDescription: request.requestDescription || request.description || "",
     sectorLocation: request.sectorLocation || "",
     client: {
+      id: client.id || null,
       searchType: "Reniec",
       fullName: client.fullName || "",
       documentNumber: client.documentNumber || "",
@@ -56,6 +57,7 @@ const formatCertificateRequestResponse = (request) => {
       nro_licence: client.nro_licence || null,
     },
     partnerClient: {
+      id: partner.id || null,
       searchType: partner.id ? "Reniec" : "",
       fullName: partner.fullName || "",
       documentNumber: partner.documentNumber || "",

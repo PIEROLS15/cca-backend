@@ -241,9 +241,23 @@ const deleteCertificate = async (id) => {
   await prisma.certificate.delete({ where: { id } });
 };
 
+const getCertificateByNumber = async (certificateNumber) => {
+  const certificate = await prisma.certificate.findFirst({
+    where: { certificateNumber },
+    include: certificateInclude,
+  });
+
+  if (!certificate) {
+    throw new HttpError(404, "Certificado no encontrado");
+  }
+
+  return formatCertificateResponse(certificate);
+};
+
 module.exports = {
   listCertificates,
   getCertificateById,
+  getCertificateByNumber,
   createCertificate,
   updateCertificate,
   deleteCertificate,

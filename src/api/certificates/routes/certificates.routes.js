@@ -7,6 +7,7 @@ const router = express.Router();
 router.use(authRequired);
 
 router.get("/", certificatesController.listCertificates);
+router.get("/download/:filename", certificatesController.downloadCertificatePdfByFilename);
 router.get("/:id", certificatesController.getCertificateById);
 router.get("/:id/pdf", certificatesController.downloadCertificatePdf);
 router.post("/", certificatesController.createCertificate);

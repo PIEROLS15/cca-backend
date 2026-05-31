@@ -41,7 +41,18 @@ const downloadCertificatePdf = asyncHandler(async (req, res) => {
   const pdfBuffer = await buildCertificatePdf(certificate);
 
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="certificado-${certificate.certificateNumber}.pdf"`);
+  res.setHeader("Content-Disposition", `inline; filename="certificado-${certificate.certificateNumber}.pdf"`);
+  res.send(pdfBuffer);
+});
+
+const downloadCertificatePdfByFilename = asyncHandler(async (req, res) => {
+  const filename = req.params.filename || "";
+  const certificateNumber = filename.replace(/^certificado-/, "").replace(/\.pdf$/, "");
+  const certificate = await certificatesService.getCertificateByNumber(certificateNumber);
+  const pdfBuffer = await buildCertificatePdf(certificate);
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
   res.send(pdfBuffer);
 });
 
@@ -52,4 +63,5 @@ module.exports = {
   updateCertificate,
   deleteCertificate,
   downloadCertificatePdf,
+  downloadCertificatePdfByFilename,
 };
