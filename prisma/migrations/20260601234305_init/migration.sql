@@ -4,9 +4,6 @@ CREATE TYPE "public"."ClientType" AS ENUM ('Comunero', 'Tercero');
 -- CreateEnum
 CREATE TYPE "public"."CertificateStatus" AS ENUM ('PorFirmar', 'PorRecoger', 'Entregado');
 
--- CreateEnum
-CREATE TYPE "public"."RequestStatus" AS ENUM ('Pendiente', 'Aprobada', 'Rechazada');
-
 -- CreateTable
 CREATE TABLE "public"."User" (
     "id" SERIAL NOT NULL,
@@ -143,7 +140,6 @@ CREATE TABLE "public"."AssemblyRecordRequest" (
     "certificateId" INTEGER NOT NULL,
     "userId" INTEGER,
     "description" TEXT,
-    "status" "public"."RequestStatus" NOT NULL DEFAULT 'Pendiente',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

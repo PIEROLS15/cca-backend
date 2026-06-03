@@ -56,6 +56,11 @@ const downloadCertificatePdfByFilename = asyncHandler(async (req, res) => {
   res.send(pdfBuffer);
 });
 
+const lookupCertificateByNumber = asyncHandler(async (req, res) => {
+  const certificate = await certificatesService.getCertificateByNumber(req.params.number);
+  res.json(certificate);
+});
+
 module.exports = {
   listCertificates,
   getCertificateById,
@@ -64,4 +69,5 @@ module.exports = {
   deleteCertificate,
   downloadCertificatePdf,
   downloadCertificatePdfByFilename,
+  lookupCertificateByNumber,
 };
