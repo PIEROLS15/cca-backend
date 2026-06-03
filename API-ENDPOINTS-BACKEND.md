@@ -47,7 +47,7 @@ Respuesta:
 }
 ```
 
-## 1) Auth
+## 1) Auth (no requiere rol especifico)
 
 ### POST `/api/auth/login`
 
@@ -196,15 +196,15 @@ Respuesta:
 }
 ```
 
-## 2) Roles
+## 2) Roles (requiere rol `Admin`)
 
 ### GET `/api/roles?page=1&limit=10`
+
+Query params: `page`, `limit`, cualquier otro se pasa al servicio.
 
 ### GET `/api/roles/:id`
 
 ### POST `/api/roles`
-
-Body:
 
 ```json
 {
@@ -238,14 +238,17 @@ Body:
 
 ### DELETE `/api/roles/:id`
 
-## 3) Users
+Respuesta: `{ "message": "...", "error": false, "status": 200, "data": null }`
+
+## 3) Users (requiere rol `Admin` o `Presidente`)
 
 ### GET `/api/users?page=1&limit=10`
 
 Filtros opcionales:
 
-- `roleId=2`
-- `isActive=true|false`
+- `roleId` (numero)
+- `isActive` (`true` o `false`)
+- cualquier otro se pasa al servicio
 
 ### GET `/api/users/:id`
 
@@ -314,6 +317,8 @@ Shape esperado del usuario en respuestas:
 
 ### DELETE `/api/users/:id`
 
+Respuesta: `204 No Content`
+
 ## 4) Sectors
 
 ### GET `/api/sectors?page=1&limit=10`
@@ -337,6 +342,8 @@ Shape esperado del usuario en respuestas:
 ```
 
 ### DELETE `/api/sectors/:id`
+
+Respuesta: `204 No Content`
 
 ## 5) Terrain Types
 
@@ -362,6 +369,8 @@ Shape esperado del usuario en respuestas:
 
 ### DELETE `/api/terrain-types/:id`
 
+Respuesta: `204 No Content`
+
 ## 6) Clients
 
 ### GET `/api/clients?page=1&limit=10`
@@ -376,6 +385,15 @@ Observaciones:
 - `nro_licence` se devuelve solo cuando el cliente es `Comunero`
 - el correlativo de `nro_licence` se asigna automaticamente en backend
 - no se envía `nro_licence` en `POST` ni en `PUT`
+
+### GET `/api/clients/search/:document`
+
+Busca un cliente por numero de documento en la base de datos local.
+Requiere al menos 3 caracteres.
+
+### GET `/api/clients/reniec/:document`
+
+Consulta el DNI en la API externa de RENIEC. Requiere exactamente 8 digitos.
 
 ### GET `/api/clients/:id`
 
@@ -427,19 +445,19 @@ Si un cliente `Comunero` pasa a `Tercero`, el sistema conserva la secuencia inte
 
 ### DELETE `/api/clients/:id`
 
+Respuesta: `204 No Content`
+
 ## 7) Certificate Requests
 
 ### GET `/api/certificate-requests?page=1&limit=10`
 
-Query opcional adicional:
+### GET `/api/certificate-requests/download/:filename`
 
-- `status=Pendiente|Aprobada|Rechazada`
+Descarga el PDF por nombre de archivo (ej: `solicitud-certificado-003223-26.pdf`). El PDF se sirve inline.
 
 ### GET `/api/certificate-requests/:id`
 
 Acepta tanto el `id` numerico como el `requestNumber` (ej: `000001` o `000001-26`).
-
-### GET `/api/certificate-requests/:id/pdf`
 
 ### POST `/api/certificate-requests`
 
@@ -562,6 +580,8 @@ Estructura de respuesta de `GET /api/certificate-requests/:id`:
 
 ### DELETE `/api/certificate-requests/:id`
 
+Respuesta: `204 No Content`
+
 ## 8) Certificates
 
 ### GET `/api/certificates?page=1&limit=10`
@@ -578,9 +598,20 @@ Filtros opcionales:
 - `sectorId` — ID del sector
 - `terrainTypeId` — ID del tipo de terreno
 
+### GET `/api/certificates/download/:filename`
+
+Descarga el PDF por nombre de archivo (ej: `certificado-000001.pdf`). El PDF se sirve inline.
+Internamente busca el certificado por `certificateNumber` extrayendolo del nombre del archivo.
+
+### GET `/api/certificates/by-number/:number`
+
+Busca un certificado por su numero exacto (ej: `000001`). Util para el formulario de solicitudes de acta.
+
 ### GET `/api/certificates/:id`
 
 ### GET `/api/certificates/:id/pdf`
+
+Descarga el PDF del certificado por ID. El PDF se sirve inline.
 
 ### POST `/api/certificates`
 
@@ -692,19 +723,34 @@ Estructura de respuesta de `GET /api/certificates/:id`:
 
 ### DELETE `/api/certificates/:id`
 
-## 9) Assembly Record Requests
+Respuesta: `204 No Content`
+
+## 9) Assembly Record Requests (sin estado)
 
 ### GET `/api/assembly-record-requests?page=1&limit=10`
-
-Query opcional adicional:
-
-- `status=Pendiente|Aprobada|Rechazada`
 
 ### GET `/api/assembly-record-requests/:id`
 
 ### GET `/api/assembly-record-requests/:id/preview`
 
+Retorna un resumen de la solicitud:
+
+```json
+{
+  "code": "SOL-ACTA-000001",
+  "client": "Arias Aburto, Olga Lidia",
+  "certificateNumber": "000001",
+  "preview": "Solicitud SOL-ACTA-000001 basada en certificado 000001"
+}
+```
+
 ### GET `/api/assembly-record-requests/:id/pdf`
+
+Nota: Retorna el PDF en `inline` (visualizacion en navegador).
+
+### GET `/api/assembly-record-requests/download/:filename`
+
+Descarga un PDF previamente generado por su nombre de archivo. Ejemplo: `solicitud-acta-SOL-ACTA-000001.pdf`
 
 ### POST `/api/assembly-record-requests`
 
@@ -720,12 +766,13 @@ Query opcional adicional:
 
 ```json
 {
-  "description": "Solicitud validada",
-  "status": "Aprobada"
+  "description": "Solicitud validada"
 }
 ```
 
 ### DELETE `/api/assembly-record-requests/:id`
+
+Respuesta: `204 No Content`
 
 ## 10) Dashboard
 
@@ -761,10 +808,10 @@ Respuesta:
 
 Devuelve certificados, solicitudes de certificados y solicitudes de acta agrupados por mes.
 
-Query params opcionales:
+Query params opcionales (aplica tambien a status-breakdown):
 
-- `from=YYYY-MM-DD` — filtrar desde esta fecha
-- `to=YYYY-MM-DD` — filtrar hasta esta fecha
+- `from=YYYY-MM-DD` — filtrar desde esta fecha (inicio del dia UTC)
+- `to=YYYY-MM-DD` — filtrar hasta esta fecha (fin del dia UTC)
 
 Respuesta:
 
@@ -803,8 +850,7 @@ Exporta Excel (`.xlsx`) y acepta los mismos filtros que `GET /api/certificates`:
 ## Valores permitidos (enums)
 
 - `clientType`: `Comunero`, `Tercero`
-- `certificate status`: `Por Firmar`, `Por Recoger`, `Entregado`
-- `request status`: `Pendiente`, `Aprobada`, `Rechazada`
+- `CertificateStatus`: `Por Firmar`, `Por Recoger`, `Entregado`
 
 ## Roles base que se crean automaticamente
 

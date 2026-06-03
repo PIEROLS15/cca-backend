@@ -12,16 +12,11 @@ const nextCode = async () => {
   return buildAssemblyRequestCode((lastRequest?.id || 0) + 1);
 };
 
-const listAssemblyRecordRequests = async ({ status, page, limit }) => {
+const listAssemblyRecordRequests = async ({ page, limit }) => {
   const pagination = getPaginationParams({ page, limit });
-
-  const where = {
-    status: status || undefined,
-  };
 
   const [docs, total] = await Promise.all([
     prisma.assemblyRecordRequest.findMany({
-      where,
       include: {
         client: true,
         certificate: true,
@@ -31,7 +26,7 @@ const listAssemblyRecordRequests = async ({ status, page, limit }) => {
       skip: pagination.skip,
       take: pagination.limit,
     }),
-    prisma.assemblyRecordRequest.count({ where }),
+    prisma.assemblyRecordRequest.count(),
   ]);
 
   return buildPaginationResult({
@@ -45,6 +40,23 @@ const listAssemblyRecordRequests = async ({ status, page, limit }) => {
 const getAssemblyRecordRequestById = async (id) => {
   const request = await prisma.assemblyRecordRequest.findUnique({
     where: { id },
+    include: {
+      client: true,
+      certificate: true,
+      user: true,
+    },
+  });
+
+  if (!request) {
+    throw new HttpError(404, "Solicitud de acta no encontrada");
+  }
+
+  return request;
+};
+
+const getAssemblyRecordRequestByCode = async (code) => {
+  const request = await prisma.assemblyRecordRequest.findUnique({
+    where: { code },
     include: {
       client: true,
       certificate: true,
@@ -89,7 +101,6 @@ const updateAssemblyRecordRequest = async (id, payload) => {
     where: { id },
     data: {
       description: payload.description,
-      status: payload.status,
     },
     include: {
       client: true,
@@ -107,6 +118,7 @@ const deleteAssemblyRecordRequest = async (id) => {
 module.exports = {
   listAssemblyRecordRequests,
   getAssemblyRecordRequestById,
+  getAssemblyRecordRequestByCode,
   createAssemblyRecordRequest,
   updateAssemblyRecordRequest,
   deleteAssemblyRecordRequest,

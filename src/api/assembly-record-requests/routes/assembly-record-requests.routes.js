@@ -7,6 +7,7 @@ const router = express.Router();
 router.use(authRequired);
 
 router.get("/", assemblyRecordRequestsController.listAssemblyRecordRequests);
+router.get("/download/:filename", assemblyRecordRequestsController.downloadAssemblyRecordRequestPdfByFilename);
 router.get("/:id", assemblyRecordRequestsController.getAssemblyRecordRequestById);
 router.get("/:id/preview", assemblyRecordRequestsController.previewAssemblyRecordRequest);
 router.get("/:id/pdf", assemblyRecordRequestsController.downloadAssemblyRecordRequestPdf);
