@@ -57,7 +57,8 @@ async function seedClients(prisma) {
   }
 
   const allDocs = new Set([...clientMap.keys(), ...commonerMap.keys()]);
-  const records = [];
+  const clientRecords = [];
+  const comuneroData = [];
 
   for (const doc of allDocs) {
     const client = clientMap.get(doc);
@@ -71,13 +72,11 @@ async function seedClients(prisma) {
 
       const licenseSeq = parseInt(commoner.nro_licence, 10);
 
-      records.push({
+      clientRecords.push({
         fullName,
         documentNumber: doc,
         address: client?.direction?.trim() || null,
         phone: client?.mobilephone?.trim() || null,
-        clientType: "Comunero",
-        licenseSequence: isNaN(licenseSeq) ? null : licenseSeq,
         createdAt: client
           ? new Date(Math.max(+new Date(commoner.createdAt), +new Date(client.createdAt)))
           : new Date(commoner.createdAt),
@@ -85,14 +84,19 @@ async function seedClients(prisma) {
           ? new Date(Math.max(+new Date(commoner.updatedAt), +new Date(client.updatedAt)))
           : new Date(commoner.updatedAt),
       });
+
+      comuneroData.push({
+        documentNumber: doc,
+        licenseSequence: isNaN(licenseSeq) ? null : licenseSeq,
+        createdAt: new Date(commoner.createdAt),
+        updatedAt: new Date(commoner.updatedAt),
+      });
     } else {
-      records.push({
+      clientRecords.push({
         fullName: client.fullname?.trim() || "-",
         documentNumber: doc,
         address: client.direction?.trim() || null,
         phone: client.mobilephone?.trim() || null,
-        clientType: "Tercero",
-        licenseSequence: null,
         createdAt: new Date(client.createdAt),
         updatedAt: new Date(client.updatedAt),
       });
@@ -104,25 +108,47 @@ async function seedClients(prisma) {
   });
   const existingSet = new Set(existingDocs.map((c) => c.documentNumber));
 
-  const newRecords = records.filter((r) => !existingSet.has(r.documentNumber));
+  const newClientRecords = clientRecords.filter((r) => !existingSet.has(r.documentNumber));
 
-  if (newRecords.length === 0) {
-    console.log(`  ✓ 0 clientes nuevos (${records.length} ya existentes)`);
+  if (newClientRecords.length === 0) {
+    console.log(`  ✓ 0 clientes nuevos (${clientRecords.length} ya existentes)`);
     const comuneroCount = [...allDocs].filter((d) => commonerMap.has(d)).length;
-    console.log(`    ${comuneroCount} comuneros, ${records.length - comuneroCount} terceros`);
+    console.log(`    ${comuneroCount} comuneros, ${clientRecords.length - comuneroCount} terceros`);
     return;
   }
 
   let imported = 0;
-  for (let i = 0; i < newRecords.length; i += 100) {
-    const batch = newRecords.slice(i, i + 100);
+  for (let i = 0; i < newClientRecords.length; i += 100) {
+    const batch = newClientRecords.slice(i, i + 100);
     await prisma.client.createMany({ data: batch, skipDuplicates: true });
     imported += batch.length;
   }
 
-  const comuneroCount = records.filter((r) => r.clientType === "Comunero").length;
-  console.log(`  ✓ ${imported} clientes importados${imported < records.length ? ` (${records.length - imported} ya existentes)` : ""}`);
-  console.log(`    ${comuneroCount} comuneros, ${records.length - comuneroCount} terceros`);
+  const createdClients = await prisma.client.findMany({
+    where: { documentNumber: { in: newClientRecords.map((r) => r.documentNumber) } },
+    select: { id: true, documentNumber: true },
+  });
+  const clientIdByDoc = new Map(createdClients.map((c) => [c.documentNumber, c.id]));
+
+  const profileRecords = comuneroData
+    .filter((c) => clientIdByDoc.has(c.documentNumber))
+    .map((c) => ({
+      clientId: clientIdByDoc.get(c.documentNumber),
+      licenseSequence: c.licenseSequence,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    }));
+
+  if (profileRecords.length > 0) {
+    for (let i = 0; i < profileRecords.length; i += 100) {
+      const batch = profileRecords.slice(i, i + 100);
+      await prisma.commoner.createMany({ data: batch, skipDuplicates: true });
+    }
+  }
+
+  const comuneroCount = [...allDocs].filter((d) => commonerMap.has(d)).length;
+  console.log(`  ✓ ${imported} clientes importados${imported < clientRecords.length ? ` (${clientRecords.length - imported} ya existentes)` : ""}`);
+  console.log(`    ${comuneroCount} comuneros, ${clientRecords.length - comuneroCount} terceros`);
 }
 
 module.exports = { seedClients };

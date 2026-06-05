@@ -39,11 +39,11 @@ const normalizeClientPayload = (payload = {}, currentClient = null) => ({
   documentNumber: hasOwn(payload, "documentNumber") ? normalizeString(payload.documentNumber) : currentClient?.documentNumber,
   address: hasOwn(payload, "address") ? normalizeOptionalString(payload.address) : currentClient?.address ?? null,
   phone: hasOwn(payload, "phone") ? normalizeOptionalString(payload.phone) : currentClient?.phone ?? null,
-  clientType: hasOwn(payload, "clientType") ? payload.clientType : currentClient?.clientType,
+  isComunero: hasOwn(payload, "isComunero") ? Boolean(payload.isComunero) : currentClient?.commoner != null,
 });
 
 const getNextLicenseSequence = async (tx) => {
-  const lastComunero = await tx.client.findFirst({
+  const lastProfile = await tx.commoner.findFirst({
     where: {
       licenseSequence: {
         not: null,
@@ -57,24 +57,33 @@ const getNextLicenseSequence = async (tx) => {
     },
   });
 
-  return (lastComunero?.licenseSequence ?? 0) + 1;
+  return (lastProfile?.licenseSequence ?? 0) + 1;
 };
 
 const buildClientWriteData = async (tx, payload = {}, currentClient = null) => {
   const data = normalizeClientPayload(payload, currentClient);
+  const { isComunero, ...clientData } = data;
 
-  if (data.clientType === "Comunero") {
-    return {
-      ...data,
-      licenseSequence: currentClient?.licenseSequence ?? await getNextLicenseSequence(tx),
+  const wantsComunero = isComunero;
+  const isCurrentlyComunero = currentClient?.commoner != null;
+
+  if (wantsComunero && !isCurrentlyComunero) {
+    clientData.commoner = {
+      create: { licenseSequence: await getNextLicenseSequence(tx) },
+    };
+  } else if (wantsComunero && isCurrentlyComunero) {
+    if (currentClient.commoner.licenseSequence == null) {
+      clientData.commoner = {
+        update: { licenseSequence: await getNextLicenseSequence(tx) },
+      };
+    }
+  } else if (!wantsComunero && isCurrentlyComunero) {
+    clientData.commoner = {
+      update: { licenseSequence: null },
     };
   }
 
-  return {
-    ...data,
-    // Preserve previously assigned licenses for historical traceability.
-    licenseSequence: currentClient?.licenseSequence ?? null,
-  };
+  return clientData;
 };
 
 const formatClientResponse = (client) => {
@@ -82,11 +91,13 @@ const formatClientResponse = (client) => {
     return client;
   }
 
-  const { licenseSequence, ...rest } = client;
+  const { commoner, ...rest } = client;
 
   return {
     ...rest,
-    nro_licence: rest.clientType === "Comunero" ? formatLicenseNumber(licenseSequence) : null,
+    clientType: commoner ? "Comunero" : "Tercero",
+    nro_licence: commoner?.licenseSequence != null ? formatLicenseNumber(commoner.licenseSequence) : null,
+    licenseSequence: commoner?.licenseSequence ?? null,
   };
 };
 

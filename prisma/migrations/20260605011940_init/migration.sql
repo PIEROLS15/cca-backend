@@ -1,7 +1,4 @@
 -- CreateEnum
-CREATE TYPE "public"."ClientType" AS ENUM ('Comunero', 'Tercero');
-
--- CreateEnum
 CREATE TYPE "public"."CertificateStatus" AS ENUM ('PorFirmar', 'PorRecoger', 'Entregado');
 
 -- CreateTable
@@ -78,12 +75,21 @@ CREATE TABLE "public"."Client" (
     "documentNumber" TEXT NOT NULL,
     "address" TEXT,
     "phone" TEXT,
-    "clientType" "public"."ClientType" NOT NULL,
-    "licenseSequence" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Client_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."Commoner" (
+    "id" SERIAL NOT NULL,
+    "clientId" INTEGER NOT NULL,
+    "licenseSequence" INTEGER,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Commoner_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -171,7 +177,10 @@ CREATE UNIQUE INDEX "TerrainType_name_key" ON "public"."TerrainType"("name");
 CREATE UNIQUE INDEX "Client_documentNumber_key" ON "public"."Client"("documentNumber");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Client_licenseSequence_key" ON "public"."Client"("licenseSequence");
+CREATE UNIQUE INDEX "Commoner_clientId_key" ON "public"."Commoner"("clientId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Commoner_licenseSequence_key" ON "public"."Commoner"("licenseSequence");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "CertificateRequest_requestNumber_key" ON "public"."CertificateRequest"("requestNumber");
@@ -190,6 +199,9 @@ ALTER TABLE "public"."RolePermission" ADD CONSTRAINT "RolePermission_roleId_fkey
 
 -- AddForeignKey
 ALTER TABLE "public"."RolePermission" ADD CONSTRAINT "RolePermission_permissionId_fkey" FOREIGN KEY ("permissionId") REFERENCES "public"."Permission"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Commoner" ADD CONSTRAINT "Commoner_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "public"."Client"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."CertificateRequest" ADD CONSTRAINT "CertificateRequest_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "public"."Client"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

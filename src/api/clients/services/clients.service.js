@@ -40,7 +40,10 @@ const runClientWriteTransaction = async (handler) => {
 };
 
 const getClientRecordById = async (id, db = prisma) => {
-  const client = await db.client.findUnique({ where: { id } });
+  const client = await db.client.findUnique({
+    where: { id },
+    include: { commoner: true },
+  });
   if (!client) {
     throw new HttpError(404, "Cliente no encontrado");
   }
@@ -51,16 +54,18 @@ const getClientRecordById = async (id, db = prisma) => {
 const listClients = async ({ clientType, page, limit }) => {
   const pagination = getPaginationParams({ page, limit });
 
-  const where = {
-    clientType: clientType || undefined,
-    ...(clientType === "Comunero" ? { licenseSequence: { not: null } } : {}),
-  };
+  const where = clientType === "Comunero"
+    ? { commoner: { isNot: null } }
+    : clientType === "Tercero"
+      ? { commoner: null }
+      : {};
 
   const [docs, total] = await Promise.all([
     prisma.client.findMany({
       where,
+      include: { commoner: true },
       orderBy: clientType === "Comunero"
-        ? { licenseSequence: "desc" }
+        ? { commoner: { licenseSequence: "desc" } }
         : { createdAt: "desc" },
       skip: pagination.skip,
       take: pagination.limit,
@@ -85,6 +90,7 @@ const createClient = async (payload) => {
     const data = await buildClientWriteData(tx, payload);
     const client = await tx.client.create({
       data,
+      include: { commoner: true },
     });
 
     return formatClientResponse(client);
@@ -98,6 +104,7 @@ const updateClient = async (id, payload) => {
     const client = await tx.client.update({
       where: { id },
       data,
+      include: { commoner: true },
     });
 
     return formatClientResponse(client);
@@ -108,6 +115,7 @@ const upsertClientByDocument = async (documentNumber, payload) => {
   return runClientWriteTransaction(async (tx) => {
     const currentClient = await tx.client.findUnique({
       where: { documentNumber },
+      include: { commoner: true },
     });
 
     const data = await buildClientWriteData(
@@ -120,11 +128,13 @@ const upsertClientByDocument = async (documentNumber, payload) => {
       return tx.client.update({
         where: { id: currentClient.id },
         data,
+        include: { commoner: true },
       });
     }
 
     return tx.client.create({
-      data,
+      data: { ...data, documentNumber },
+      include: { commoner: true },
     });
   });
 };
@@ -143,6 +153,7 @@ const deleteClient = async (id) => {
 const searchByDocument = async (document) => {
   const client = await prisma.client.findFirst({
     where: { documentNumber: { contains: document } },
+    include: { commoner: true },
   });
 
   if (!client) {

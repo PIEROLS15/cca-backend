@@ -22,9 +22,9 @@ const getClientById = asyncHandler(async (req, res) => {
 });
 
 const createClient = asyncHandler(async (req, res) => {
-  const { fullName, documentNumber, clientType } = req.body;
-  if (!fullName || !documentNumber || !clientType) {
-    throw new HttpError(400, "fullName, documentNumber y clientType son obligatorios");
+  const { fullName, documentNumber, isComunero } = req.body;
+  if (!fullName || !documentNumber || isComunero === undefined) {
+    throw new HttpError(400, "fullName, documentNumber e isComunero son obligatorios");
   }
 
   const client = await clientsService.createClient(req.body);

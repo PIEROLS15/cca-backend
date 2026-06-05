@@ -10,9 +10,11 @@ const STATUS_LABELS = {
   Entregado: "Entregado",
 };
 
-const toSummary = ({ certificates, clients, terrainTypes, sectors }) => ({
+const toSummary = ({ certificates, clients, comuneros, terceros, terrainTypes, sectors }) => ({
   certificates,
   clients,
+  comuneros,
+  terceros,
   terrainTypes,
   sectors,
 });

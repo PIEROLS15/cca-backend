@@ -7,14 +7,15 @@ const MONTHS = [
 ];
 
 const getSummary = async () => {
-  const [certificates, clients, terrainTypes, sectors] = await Promise.all([
+  const [certificates, clients, comuneros, terrainTypes, sectors] = await Promise.all([
     prisma.certificate.count(),
     prisma.client.count(),
+    prisma.commoner.count({ where: { licenseSequence: { not: null } } }),
     prisma.terrainType.count(),
     prisma.sector.count(),
   ]);
 
-  return toSummary({ certificates, clients, terrainTypes, sectors });
+  return toSummary({ certificates, clients, comuneros, terceros: clients - comuneros, terrainTypes, sectors });
 };
 
 const getStatusBreakdown = async ({ from, to } = {}) => {
