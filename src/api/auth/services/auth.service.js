@@ -56,7 +56,7 @@ const login = async ({ username, password }) => {
   };
 };
 
-const updateProfile = async (userId, { fullName, username, email }) => {
+const updateProfile = async (userId, { fullName, username, email, dni }) => {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
     throw new HttpError(404, "Usuario no encontrado");
@@ -79,9 +79,19 @@ const updateProfile = async (userId, { fullName, username, email }) => {
     }
   }
 
+  if (dni && dni !== user.dni) {
+    const existingByDni = await prisma.user.findFirst({
+      where: { dni, id: { not: userId } },
+      select: { id: true },
+    });
+    if (existingByDni) {
+      throw new HttpError(409, "El DNI ya esta en uso");
+    }
+  }
+
   const updated = await prisma.user.update({
     where: { id: userId },
-    data: { fullName, username, email },
+    data: { fullName, username, email, dni },
     include: {
       role: {
         include: withRoleInclude,
