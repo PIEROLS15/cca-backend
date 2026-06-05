@@ -101,6 +101,69 @@ pnpm prisma migrate dev
 
 ---
 
+## Docker
+
+### Prerequisitos
+
+- [Docker](https://docs.docker.com/engine/install/) y [Docker Compose](https://docs.docker.com/compose/install/) instalados.
+
+### Primer despliegue
+
+1. Crea el archivo `.env` en la raiz de `cca-backend` usando `.env.example` como referencia:
+
+```bash
+cp .env.example .env
+# Edita las variables segun tu entorno
+```
+
+2. Construye e inicia los contenedores:
+
+```bash
+docker compose up -d --build
+```
+
+Esto levanta:
+- **PostgreSQL 16** en el puerto configurado (`POSTGRES_PORT`)
+- **Backend** en el puerto configurado (`BACKEND_PORT`)
+
+En el primer arranque ejecuta automaticamente:
+- `prisma migrate deploy` (migraciones)
+- Todos los seeds (importacion desde APIs externas + archivos locales)
+
+### Arranques posteriores
+
+```bash
+docker compose up -d
+```
+
+El entrypoint detecta que la base de datos ya tiene datos y salta los seeds, arrancando el servidor en segundos.
+
+### Forzar re-ejecucion de seeds
+
+```bash
+FORCE_SEEDS=true docker compose up -d --build
+```
+
+**No agregues `FORCE_SEEDS` al `.env`**. Usalo solo como variable inline cuando necesites re-importar todos los datos desde las APIs.
+
+### Seed data
+
+Los siguientes datos se importan automaticamente en el primer arranque (o con `FORCE_SEEDS=true`):
+
+| Seed | Origen | Registros aprox. |
+|---|---|---|
+| Roles | Fijo (`prisma/seed/roles.js`) | 8 |
+| Usuarios | Fijo (`prisma/seed/users.js`) | 1 (admin) |
+| Sectores | API externa | 71 |
+| Tipos de terreno | API externa | 13 |
+| Clientes | API externa (2 endpoints) | ~8600 |
+| Usuarios anteriores | JSON local (`prisma/seed/users-data.json`) | 14 |
+| Solicitudes de certificados | API externa (paginada) | ~3400 |
+| Certificados | API externa (paginada) | ~9200 |
+| Solicitudes de acta de asamblea | API externa (paginada) | ~80 |
+
+---
+
 ## Desarrollo
 
 Inicia el servidor en modo desarrollo:
