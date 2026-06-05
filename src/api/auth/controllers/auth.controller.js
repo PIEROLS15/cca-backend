@@ -36,7 +36,7 @@ const logout = asyncHandler(async (req, res) => {
 });
 
 const updateProfile = asyncHandler(async (req, res) => {
-  const { fullName, username, email } = req.body;
+  const { fullName, username, email, dni } = req.body;
 
   if (!fullName || !username) {
     throw new HttpError(400, "fullName y username son obligatorios");
@@ -46,6 +46,7 @@ const updateProfile = asyncHandler(async (req, res) => {
     fullName: fullName.trim(),
     username: username.trim(),
     email: email ? email.trim() : undefined,
+    dni: dni ? dni.trim() : undefined,
   });
 
   res.json({ user });
