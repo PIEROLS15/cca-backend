@@ -5,14 +5,21 @@ const { normalizeName } = require("../utils/terrain-types.utils");
 
 const listTerrainTypes = async (query) => {
   const { page, limit, skip } = getPaginationParams(query);
+  const { search } = query;
+
+  const where = {};
+  if (search) {
+    where.name = { contains: search, mode: "insensitive" };
+  }
 
   const [docs, total] = await Promise.all([
     prisma.terrainType.findMany({
+      where,
       orderBy: { id: "desc" },
       skip,
       take: limit,
     }),
-    prisma.terrainType.count(),
+    prisma.terrainType.count({ where }),
   ]);
 
   return buildPaginationResult({

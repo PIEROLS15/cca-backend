@@ -8,6 +8,7 @@ const listCertificateRequests = asyncHandler(async (req, res) => {
   const data = await certificateRequestsService.listCertificateRequests({
     page: req.query.page,
     limit: req.query.limit,
+    search: req.query.search,
   });
   return sendSuccess(res, {
     message: "Solicitudes de certificado encontradas correctamente",

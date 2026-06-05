@@ -51,14 +51,23 @@ const getClientRecordById = async (id, db = prisma) => {
   return client;
 };
 
-const listClients = async ({ clientType, page, limit }) => {
+const listClients = async ({ clientType, page, limit, search }) => {
   const pagination = getPaginationParams({ page, limit });
 
-  const where = clientType === "Comunero"
-    ? { commoner: { isNot: null } }
-    : clientType === "Tercero"
-      ? { commoner: null }
-      : {};
+  const where = {};
+
+  if (clientType === "Comunero") {
+    where.commoner = { isNot: null };
+  } else if (clientType === "Tercero") {
+    where.commoner = null;
+  }
+
+  if (search) {
+    where.OR = [
+      { fullName: { contains: search, mode: "insensitive" } },
+      { documentNumber: { contains: search, mode: "insensitive" } },
+    ];
+  }
 
   const [docs, total] = await Promise.all([
     prisma.client.findMany({

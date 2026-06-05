@@ -40,11 +40,21 @@ const assertUniqueUserFields = async ({ email, dni, excludeUserId }) => {
 
 const listUsers = async (query) => {
   const { page, limit, skip } = getPaginationParams(query);
+  const { search } = query;
 
   const where = {
     roleId: query.roleId || undefined,
     isActive: typeof query.isActive === "boolean" ? query.isActive : undefined,
   };
+
+  if (search) {
+    where.OR = [
+      { fullName: { contains: search, mode: "insensitive" } },
+      { dni: { contains: search, mode: "insensitive" } },
+      { email: { contains: search, mode: "insensitive" } },
+      { username: { contains: search, mode: "insensitive" } },
+    ];
+  }
 
   const [users, total] = await Promise.all([
     prisma.user.findMany({
