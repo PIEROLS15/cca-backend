@@ -17,7 +17,7 @@ const certificateInclude = {
 
 const nextCertificateNumber = async () => {
   const last = await prisma.certificate.findFirst({
-    orderBy: { id: "desc" },
+    orderBy: { certificateNumber: "desc" },
     select: { certificateNumber: true },
   });
 
@@ -33,7 +33,7 @@ const listCertificates = async (query) => {
     prisma.certificate.findMany({
       where,
       include: certificateInclude,
-      orderBy: { id: "desc" },
+      orderBy: { certificateNumber: "desc" },
       skip: pagination.skip,
       take: pagination.limit,
     }),

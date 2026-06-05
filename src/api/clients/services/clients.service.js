@@ -53,12 +53,15 @@ const listClients = async ({ clientType, page, limit }) => {
 
   const where = {
     clientType: clientType || undefined,
+    ...(clientType === "Comunero" ? { licenseSequence: { not: null } } : {}),
   };
 
   const [docs, total] = await Promise.all([
     prisma.client.findMany({
       where,
-      orderBy: { id: "desc" },
+      orderBy: clientType === "Comunero"
+        ? { licenseSequence: "desc" }
+        : { createdAt: "desc" },
       skip: pagination.skip,
       take: pagination.limit,
     }),

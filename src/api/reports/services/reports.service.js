@@ -13,7 +13,7 @@ const exportCertificatesReport = async (query) => {
       sector: true,
       terrainType: true,
     },
-    orderBy: { id: "desc" },
+    orderBy: { certificateNumber: "desc" },
   });
 
   return buildCertificatesWorkbook(certificates);
