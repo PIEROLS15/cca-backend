@@ -7,11 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum ClientType {
-  Comunero
-  Tercero
-}
-
 enum CertificateStatus {
   PorFirmar
   PorRecoger
@@ -88,21 +83,30 @@ model TerrainType {
 }
 
 model Client {
-  id             Int          @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   fullName       String
-  documentNumber String       @unique
+  documentNumber String   @unique
   address        String?
   phone          String?
-  clientType     ClientType
-  licenseSequence Int?        @unique
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
+  commoner     Commoner?
   certificates          Certificate[]       @relation("CertificateClient")
   partnerCertificates   Certificate[]       @relation("CertificatePartner")
   certificateRequests   CertificateRequest[]
   partnerRequests       CertificateRequest[] @relation("CertificateRequestPartner")
   assemblyRecordRequests AssemblyRecordRequest[]
+}
+
+model Commoner {
+  id              Int      @id @default(autoincrement())
+  clientId        Int      @unique
+  licenseSequence Int?     @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 
 model CertificateRequest {

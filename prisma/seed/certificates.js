@@ -121,7 +121,6 @@ async function seedCertificates(prisma) {
         data: {
           documentNumber: dni,
           fullName: doc.nameLastSecondName?.trim() || "-",
-          clientType: "Tercero",
           createdAt,
           updatedAt: createdAt,
         },

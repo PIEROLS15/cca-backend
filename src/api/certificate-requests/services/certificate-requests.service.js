@@ -10,9 +10,9 @@ const {
 const clientsService = require("../../clients/services/clients.service");
 
 const requestIncludes = {
-  client: true,
+  client: { include: { commoner: true } },
   user: { include: { role: true } },
-  partner: true,
+  partner: { include: { commoner: true } },
 };
 
 const nextRequestNumber = async () => {
@@ -95,13 +95,12 @@ const createCertificateRequest = async (payload, userId) => {
 
   const requestNumber = await nextRequestNumber();
   const isComunero = typeof payload.isComunero === "boolean" ? payload.isComunero : true;
-  const clientType = isComunero ? "Comunero" : "Tercero";
 
   const client = await clientsService.upsertClientByDocument(documentNumber, {
     fullName,
     address: clientSnapshot.address || null,
     phone: null,
-    clientType,
+    isComunero,
   });
 
   let partnerId = null;
@@ -116,7 +115,7 @@ const createCertificateRequest = async (payload, userId) => {
         fullName: partnerName,
         address: partnerClient.address || null,
         phone: null,
-        clientType: "Tercero",
+        isComunero: false,
       });
       partnerId = partner.id;
     }
@@ -160,14 +159,13 @@ const updateCertificateRequest = async (id, payload) => {
     const name = String(clientSnapshot.fullName || "").trim();
 
     if (doc && name) {
-      const isComunero = typeof payload.isComunero === "boolean" ? payload.isComunero : current.client?.clientType === "Comunero";
-      const clientType = isComunero ? "Comunero" : "Tercero";
+      const isComunero = typeof payload.isComunero === "boolean" ? payload.isComunero : current.client?.commoner != null;
 
       const updatedClient = await clientsService.upsertClientByDocument(doc, {
         fullName: name,
         address: clientSnapshot.address || null,
         phone: null,
-        clientType,
+        isComunero,
       });
       data.clientId = updatedClient.id;
     }
@@ -184,7 +182,7 @@ const updateCertificateRequest = async (id, payload) => {
         fullName: partnerName,
         address: partnerClient.address || null,
         phone: null,
-        clientType: "Tercero",
+        isComunero: false,
       });
       data.partnerId = partner.id;
     } else {

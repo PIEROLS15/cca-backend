@@ -69,7 +69,6 @@ async function findOrCreateClient(prisma, dni, fullName, createdAt) {
       data: {
         documentNumber: normalized,
         fullName: fullName?.trim() || "-",
-        clientType: "Tercero",
         createdAt: createdAt || new Date(),
         updatedAt: createdAt || new Date(),
       },

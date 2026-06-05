@@ -87,7 +87,6 @@ async function seedCertificateRequests(prisma) {
         data: {
           documentNumber: doc.documentClient,
           fullName: doc.fullNameClient?.trim() || "-",
-          clientType: doc.isComunero === true ? "Comunero" : "Tercero",
           createdAt,
           updatedAt: createdAt,
         },
