@@ -9,6 +9,7 @@ const listClients = asyncHandler(async (req, res) => {
     clientType: req.query.clientType,
     page: req.query.page,
     limit: req.query.limit,
+    search: req.query.search,
   });
   return sendSuccess(res, {
     message: "Clientes encontrados correctamente",

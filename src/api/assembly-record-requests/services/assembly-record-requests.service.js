@@ -12,11 +12,22 @@ const nextCode = async () => {
   return buildAssemblyRequestCode((lastRequest?.id || 0) + 1);
 };
 
-const listAssemblyRecordRequests = async ({ page, limit }) => {
+const listAssemblyRecordRequests = async ({ page, limit, search }) => {
   const pagination = getPaginationParams({ page, limit });
+
+  const where = {};
+  if (search) {
+    where.client = {
+      OR: [
+        { fullName: { contains: search, mode: "insensitive" } },
+        { documentNumber: { contains: search, mode: "insensitive" } },
+      ],
+    };
+  }
 
   const [docs, total] = await Promise.all([
     prisma.assemblyRecordRequest.findMany({
+      where,
       include: {
         client: true,
         certificate: true,
@@ -26,7 +37,7 @@ const listAssemblyRecordRequests = async ({ page, limit }) => {
       skip: pagination.skip,
       take: pagination.limit,
     }),
-    prisma.assemblyRecordRequest.count(),
+    prisma.assemblyRecordRequest.count({ where }),
   ]);
 
   return buildPaginationResult({

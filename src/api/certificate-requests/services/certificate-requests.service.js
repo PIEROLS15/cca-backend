@@ -25,17 +25,28 @@ const nextRequestNumber = async () => {
   return buildRequestNumber(nextSequence);
 };
 
-const listCertificateRequests = async ({ page, limit }) => {
+const listCertificateRequests = async ({ page, limit, search }) => {
   const pagination = getPaginationParams({ page, limit });
+
+  const where = {};
+  if (search) {
+    where.client = {
+      OR: [
+        { fullName: { contains: search, mode: "insensitive" } },
+        { documentNumber: { contains: search, mode: "insensitive" } },
+      ],
+    };
+  }
 
   const [docs, total] = await Promise.all([
     prisma.certificateRequest.findMany({
+      where,
       include: requestIncludes,
       orderBy: { createdAt: "desc" },
       skip: pagination.skip,
       take: pagination.limit,
     }),
-    prisma.certificateRequest.count(),
+    prisma.certificateRequest.count({ where }),
   ]);
 
   return buildPaginationResult({

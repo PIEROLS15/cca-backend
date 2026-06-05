@@ -8,6 +8,7 @@ const listAssemblyRecordRequests = asyncHandler(async (req, res) => {
   const data = await assemblyRecordRequestsService.listAssemblyRecordRequests({
     page: req.query.page,
     limit: req.query.limit,
+    search: req.query.search,
   });
   return sendSuccess(res, {
     message: "Solicitudes de acta encontradas correctamente",

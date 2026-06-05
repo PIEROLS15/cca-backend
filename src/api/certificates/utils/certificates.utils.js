@@ -90,16 +90,41 @@ const buildCertificateFilters = (query) => {
     where.terrainTypeId = Number(query.terrainTypeId);
   }
 
+  if (query.search) {
+    const s = query.search;
+    const clientSearch = {
+      OR: [
+        { fullName: { contains: s, mode: "insensitive" } },
+        { documentNumber: { contains: s, mode: "insensitive" } },
+      ],
+    };
+    where.AND = [
+      {
+        OR: [
+          { certificateNumber: { contains: s, mode: "insensitive" } },
+          { client: clientSearch },
+          { partner: clientSearch },
+        ],
+      },
+    ];
+  }
+
   if (query.name || query.documentNumber) {
     const clientConditions = [];
-    if (query.name) clientConditions.push({ fullName: { contains: query.name } });
-    if (query.documentNumber) clientConditions.push({ documentNumber: { contains: query.documentNumber } });
+    if (query.name) clientConditions.push({ fullName: { contains: query.name, mode: "insensitive" } });
+    if (query.documentNumber) clientConditions.push({ documentNumber: { contains: query.documentNumber, mode: "insensitive" } });
     const clientFilter = clientConditions.length > 0 ? { AND: clientConditions } : undefined;
 
-    where.OR = [
-      clientFilter ? { client: clientFilter } : undefined,
-      clientFilter ? { partner: clientFilter } : undefined,
-    ].filter(Boolean);
+    const existingAND = where.AND || [];
+    where.AND = [
+      ...existingAND,
+      {
+        OR: [
+          clientFilter ? { client: clientFilter } : undefined,
+          clientFilter ? { partner: clientFilter } : undefined,
+        ].filter(Boolean),
+      },
+    ];
   }
 
   return where;
