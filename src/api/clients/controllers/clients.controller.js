@@ -42,6 +42,11 @@ const deleteClient = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
+const previewDeleteClient = asyncHandler(async (req, res) => {
+  const preview = await clientsService.getClientDeletePreview(Number(req.params.id));
+  res.json(preview);
+});
+
 const searchByDocument = asyncHandler(async (req, res) => {
   const { document } = req.params;
 
@@ -70,6 +75,7 @@ module.exports = {
   createClient,
   updateClient,
   deleteClient,
+  previewDeleteClient,
   searchByDocument,
   searchReniec,
 };

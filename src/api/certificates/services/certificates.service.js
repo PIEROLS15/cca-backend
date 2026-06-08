@@ -3,16 +3,62 @@ const HttpError = require("../../../utils/http-error");
 const { buildPaginationResult, getPaginationParams } = require("../../../utils/pagination");
 const {
   normalizeCertificateStatus,
+  normalizeTerrainMeasurementMode,
+  deriveTerrainMeasurementMode,
   formatCertificateResponse,
   buildCertificateFilters,
 } = require("../utils/certificates.utils");
+const { makeDeletionPreview, makeImpactItem } = require("../../../utils/deletion-preview");
 
 const certificateInclude = {
   client: true,
   partner: true,
   sector: true,
-  terrainType: true,
+  terrainType: { include: { config: true } },
   user: { include: { role: true } },
+  certificateRequest: { select: { id: true, requestNumber: true } },
+  owners: {
+    include: { client: true },
+    orderBy: { order: "asc" },
+  },
+};
+
+const normalizeOwnerIds = (owners = []) => [...new Set(owners.map((o) => Number(o.id)).filter((id) => id > 0))];
+
+const syncCertificateOwners = async (tx, certificateId, ownerIds) => {
+  await tx.certificateOwner.deleteMany({ where: { certificateId } });
+
+  if (ownerIds.length === 0) return;
+
+  await tx.certificateOwner.createMany({
+    data: ownerIds.map((clientId, index) => ({
+      certificateId,
+      clientId,
+      order: index + 1,
+      source: index === 0 ? "primary" : index === 1 ? "partner" : `owner-${index + 1}`,
+    })),
+  });
+};
+
+const resolveOwnerClients = async (ownerIds) => {
+  if (ownerIds.length === 0) {
+    throw new HttpError(400, "Debe proporcionar al menos un propietario");
+  }
+
+  const clients = await prisma.client.findMany({
+    where: { id: { in: ownerIds } },
+    select: { id: true },
+  });
+
+  if (clients.length !== ownerIds.length) {
+    const existingIds = new Set(clients.map((client) => client.id));
+    const missing = ownerIds.find((id) => !existingIds.has(id));
+    if (missing) {
+      throw new HttpError(404, missing === ownerIds[0] ? "Cliente no encontrado" : "Uno de los propietarios no fue encontrado");
+    }
+  }
+
+  return ownerIds;
 };
 
 const nextCertificateNumber = async () => {
@@ -33,7 +79,10 @@ const listCertificates = async (query) => {
     prisma.certificate.findMany({
       where,
       include: certificateInclude,
-      orderBy: { certificateNumber: "desc" },
+      orderBy: [
+        { createdAt: "desc" },
+        { certificateNumber: "desc" },
+      ],
       skip: pagination.skip,
       take: pagination.limit,
     }),
@@ -66,24 +115,21 @@ const createCertificate = async (payload, userId) => {
     throw new HttpError(401, "Usuario autenticado requerido");
   }
 
-  const ownerIds = [...new Set((payload.owners || []).map((o) => Number(o.id)).filter((id) => id > 0))];
-
-  if (ownerIds.length === 0) {
-    throw new HttpError(400, "Debe proporcionar al menos un propietario");
-  }
-
+  const ownerIds = await resolveOwnerClients(normalizeOwnerIds(payload.owners || []));
   const clientId = ownerIds[0];
-  const partnerId = ownerIds.length > 1 ? ownerIds[1] : null;
+  const partnerId = ownerIds[1] || null;
 
-  const client = await prisma.client.findUnique({ where: { id: clientId } });
-  if (!client) {
-    throw new HttpError(404, "Cliente no encontrado");
-  }
-
-  if (partnerId) {
-    const partner = await prisma.client.findUnique({ where: { id: partnerId } });
-    if (!partner) {
-      throw new HttpError(404, "Partner no encontrado");
+  let linkedRequest = null;
+  if (payload.certificateRequestId !== undefined && payload.certificateRequestId !== null) {
+    linkedRequest = await prisma.certificateRequest.findUnique({
+      where: { id: Number(payload.certificateRequestId) },
+      select: { id: true, clientId: true },
+    });
+    if (!linkedRequest) {
+      throw new HttpError(404, "Solicitud de certificado no encontrada");
+    }
+    if (linkedRequest.clientId !== clientId) {
+      throw new HttpError(400, "La solicitud no corresponde al titular principal");
     }
   }
 
@@ -105,37 +151,77 @@ const createCertificate = async (payload, userId) => {
     throw new HttpError(404, "Sector no encontrado");
   }
 
-  if (!payload.requestNumber) {
-    throw new HttpError(400, "requestNumber es obligatorio");
-  }
-
   const certificateNumber = await nextCertificateNumber();
   const statusNormalized = normalizeCertificateStatus(payload.status) || "PorFirmar";
+  const measurementModeUsed = normalizeTerrainMeasurementMode(payload.terrain?.measurementModeUsed)
+    || deriveTerrainMeasurementMode(payload.terrain);
 
-  const certificate = await prisma.certificate.create({
-    data: {
-      certificateNumber,
-      requestNumber: payload.requestNumber,
-      clientId,
-      partnerId,
-      sectorId,
-      terrainTypeId,
-      userId,
-      width: payload.terrain?.width ?? null,
-      length: payload.terrain?.length ?? null,
-      totalArea: payload.terrain?.totalArea ?? null,
-      mz: payload.location?.mz || null,
-      lot: payload.location?.lot || null,
-      north: payload.borders?.north || null,
-      south: payload.borders?.south || null,
-      east: payload.borders?.east || null,
-      west: payload.borders?.west || null,
-      status: statusNormalized,
-    },
-    include: certificateInclude,
+  const certificate = await prisma.$transaction(async (tx) => {
+    const created = await tx.certificate.create({
+      data: {
+        certificateNumber,
+        requestNumber: payload.requestNumber || "",
+        certificateRequestId: linkedRequest?.id ?? null,
+        clientId,
+        partnerId,
+        sectorId,
+        terrainTypeId,
+        userId,
+        width: payload.terrain?.width ?? null,
+        length: payload.terrain?.length ?? null,
+        totalArea: payload.terrain?.totalArea ?? null,
+        area: payload.terrain?.area ?? null,
+        perimeter: payload.terrain?.perimeter ?? null,
+        additionalWidth: payload.terrain?.additionalWidth ?? null,
+        additionalLength: payload.terrain?.additionalLength ?? null,
+        measurementModeUsed,
+        mz: payload.location?.mz || null,
+        lot: payload.location?.lot || null,
+        north: payload.borders?.north || null,
+        south: payload.borders?.south || null,
+        east: payload.borders?.east || null,
+        west: payload.borders?.west || null,
+        status: statusNormalized,
+      },
+      select: { id: true },
+    });
+
+    await syncCertificateOwners(tx, created.id, ownerIds);
+
+    return tx.certificate.findUnique({
+      where: { id: created.id },
+      include: certificateInclude,
+    });
   });
 
   return formatCertificateResponse(certificate);
+};
+
+const getCertificateDeletePreview = async (id) => {
+  const certificate = await prisma.certificate.findUnique({
+    where: { id },
+    select: {
+      certificateNumber: true,
+      _count: {
+        select: {
+          owners: true,
+          assemblyRecordRequests: true,
+        },
+      },
+    },
+  });
+
+  if (!certificate) {
+    throw new HttpError(404, "Certificado no encontrado");
+  }
+
+  return makeDeletionPreview({
+    entityLabel: "certificado",
+    itemName: certificate.certificateNumber,
+    willBlock: certificate._count.assemblyRecordRequests > 0
+      ? [makeImpactItem({ label: "Solicitudes de acta vinculadas", count: certificate._count.assemblyRecordRequests })]
+      : [],
+  });
 };
 
 const updateCertificate = async (id, payload) => {
@@ -149,22 +235,42 @@ const updateCertificate = async (id, payload) => {
   }
 
   const data = {};
+  let ownerIdsToSync = null;
 
   if (payload.owners) {
-    const ownerIds = [...new Set(payload.owners.map((o) => Number(o.id)).filter((id) => id > 0))];
-    if (ownerIds.length === 0) {
-      throw new HttpError(400, "Debe proporcionar al menos un propietario");
-    }
-    const client = await prisma.client.findUnique({ where: { id: ownerIds[0] } });
-    if (!client) throw new HttpError(404, "Cliente no encontrado");
-    data.clientId = ownerIds[0];
+    ownerIdsToSync = await resolveOwnerClients(normalizeOwnerIds(payload.owners));
+    data.clientId = ownerIdsToSync[0];
+    data.partnerId = ownerIdsToSync[1] || null;
+  }
 
-    const partnerId = ownerIds.length > 1 ? ownerIds[1] : null;
-    if (partnerId) {
-      const partner = await prisma.client.findUnique({ where: { id: partnerId } });
-      if (!partner) throw new HttpError(404, "Partner no encontrado");
+  const effectiveClientId = data.clientId || existing.clientId;
+
+  if (payload.certificateRequestId !== undefined) {
+    const linkedRequest = payload.certificateRequestId === null
+      ? null
+      : await prisma.certificateRequest.findUnique({
+          where: { id: Number(payload.certificateRequestId) },
+          select: { id: true, clientId: true },
+        });
+
+    if (payload.certificateRequestId !== null && !linkedRequest) {
+      throw new HttpError(404, "Solicitud de certificado no encontrada");
     }
-    data.partnerId = partnerId;
+
+    if (linkedRequest && effectiveClientId && linkedRequest.clientId !== effectiveClientId) {
+      throw new HttpError(400, "La solicitud no corresponde al titular principal");
+    }
+
+    data.certificateRequestId = linkedRequest?.id ?? null;
+  } else if (ownerIdsToSync && existing.certificateRequestId) {
+    const linkedRequest = await prisma.certificateRequest.findUnique({
+      where: { id: existing.certificateRequestId },
+      select: { id: true, clientId: true },
+    });
+
+    if (linkedRequest && linkedRequest.clientId !== effectiveClientId) {
+      throw new HttpError(400, "La solicitud no corresponde al titular principal");
+    }
   }
 
   if (payload.terrain !== undefined) {
@@ -181,6 +287,25 @@ const updateCertificate = async (id, payload) => {
     if ("width" in payload.terrain) data.width = payload.terrain.width ?? null;
     if ("length" in payload.terrain) data.length = payload.terrain.length ?? null;
     if ("totalArea" in payload.terrain) data.totalArea = payload.terrain.totalArea ?? null;
+    if ("area" in payload.terrain) data.area = payload.terrain.area ?? null;
+    if ("perimeter" in payload.terrain) data.perimeter = payload.terrain.perimeter ?? null;
+    if ("additionalWidth" in payload.terrain) data.additionalWidth = payload.terrain.additionalWidth ?? null;
+    if ("additionalLength" in payload.terrain) data.additionalLength = payload.terrain.additionalLength ?? null;
+    if ("measurementModeUsed" in payload.terrain) {
+      const normalizedMode = normalizeTerrainMeasurementMode(payload.terrain.measurementModeUsed);
+      if (!normalizedMode) {
+        throw new HttpError(400, "terrain.measurementModeUsed es invalido");
+      }
+      data.measurementModeUsed = normalizedMode;
+    } else {
+      data.measurementModeUsed = deriveTerrainMeasurementMode({
+        width: "width" in payload.terrain ? payload.terrain.width : existing.width,
+        length: "length" in payload.terrain ? payload.terrain.length : existing.length,
+        totalArea: "totalArea" in payload.terrain ? payload.terrain.totalArea : existing.totalArea,
+        area: "area" in payload.terrain ? payload.terrain.area : existing.area,
+        perimeter: "perimeter" in payload.terrain ? payload.terrain.perimeter : existing.perimeter,
+      });
+    }
   }
 
   if (payload.location !== undefined) {
@@ -206,8 +331,11 @@ const updateCertificate = async (id, payload) => {
   }
 
   if (payload.requestNumber !== undefined) {
-    if (!payload.requestNumber) throw new HttpError(400, "requestNumber no puede estar vacio");
-    data.requestNumber = payload.requestNumber;
+    data.requestNumber = payload.requestNumber || "";
+  }
+
+  if (payload.certificateRequestId !== undefined) {
+    data.certificateRequestId = payload.certificateRequestId ?? null;
   }
 
   if (payload.status !== undefined) {
@@ -218,25 +346,39 @@ const updateCertificate = async (id, payload) => {
     data.status = normalized;
   }
 
-  if (Object.keys(data).length > 0) {
-    await prisma.certificate.update({
+  let certificate;
+  if (Object.keys(data).length > 0 || ownerIdsToSync) {
+    certificate = await prisma.$transaction(async (tx) => {
+      if (Object.keys(data).length > 0) {
+        await tx.certificate.update({
+          where: { id },
+          data,
+        });
+      }
+
+      if (ownerIdsToSync) {
+        await syncCertificateOwners(tx, id, ownerIdsToSync);
+      }
+
+      return tx.certificate.findUnique({
+        where: { id },
+        include: certificateInclude,
+      });
+    });
+  } else {
+    certificate = await prisma.certificate.findUnique({
       where: { id },
-      data,
+      include: certificateInclude,
     });
   }
-
-  const certificate = await prisma.certificate.findUnique({
-    where: { id },
-    include: certificateInclude,
-  });
 
   return formatCertificateResponse(certificate);
 };
 
 const deleteCertificate = async (id) => {
-  const certificate = await prisma.certificate.findUnique({ where: { id } });
-  if (!certificate) {
-    throw new HttpError(404, "Certificado no encontrado");
+  const preview = await getCertificateDeletePreview(id);
+  if (!preview.canDelete) {
+    throw new HttpError(409, "No se puede eliminar el certificado porque tiene dependencias asociadas");
   }
   await prisma.certificate.delete({ where: { id } });
 };
@@ -261,4 +403,5 @@ module.exports = {
   createCertificate,
   updateCertificate,
   deleteCertificate,
+  getCertificateDeletePreview,
 };

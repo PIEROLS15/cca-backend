@@ -36,6 +36,11 @@ const deleteCertificate = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
+const previewDeleteCertificate = asyncHandler(async (req, res) => {
+  const preview = await certificatesService.getCertificateDeletePreview(Number(req.params.id));
+  res.json(preview);
+});
+
 const downloadCertificatePdf = asyncHandler(async (req, res) => {
   const certificate = await certificatesService.getCertificateById(Number(req.params.id));
   const pdfBuffer = await buildCertificatePdf(certificate);
@@ -67,6 +72,7 @@ module.exports = {
   createCertificate,
   updateCertificate,
   deleteCertificate,
+  previewDeleteCertificate,
   downloadCertificatePdf,
   downloadCertificatePdfByFilename,
   lookupCertificateByNumber,

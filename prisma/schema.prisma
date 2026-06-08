@@ -13,6 +13,12 @@ enum CertificateStatus {
   Entregado
 }
 
+enum TerrainMeasurementMode {
+  RECTANGULAR_AUTO
+  AREA_PERIMETER
+  MANUAL_TOTAL_AREA
+}
+
 model User {
   id        Int      @id @default(autoincrement())
   username  String   @unique
@@ -73,12 +79,28 @@ model Sector {
   certificates Certificate[]
 }
 
-model TerrainType {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model TerrainTypeConfig {
+  id                       Int                    @id @default(autoincrement())
+  key                      String                 @unique
+  label                    String
+  formMode                 TerrainMeasurementMode
+  showMzLot                Boolean                @default(true)
+  allowAdditionalMeasure   Boolean                @default(false)
+  allowAreaPerimeterToggle Boolean                @default(false)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
 
+  terrainTypes TerrainType[]
+}
+
+model TerrainType {
+  id                  Int      @id @default(autoincrement())
+  name                String   @unique
+  terrainTypeConfigId Int?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  config       TerrainTypeConfig? @relation(fields: [terrainTypeConfigId], references: [id])
   certificates Certificate[]
 }
 
@@ -97,6 +119,7 @@ model Client {
   certificateRequests   CertificateRequest[]
   partnerRequests       CertificateRequest[] @relation("CertificateRequestPartner")
   assemblyRecordRequests AssemblyRecordRequest[]
+  certificateOwners     CertificateOwner[]
 }
 
 model Commoner {
@@ -128,12 +151,15 @@ model CertificateRequest {
   client  Client  @relation(fields: [clientId], references: [id])
   user    User?   @relation(fields: [userId], references: [id])
   partner Client? @relation("CertificateRequestPartner", fields: [partnerId], references: [id])
+
+  certificates Certificate[]
 }
 
 model Certificate {
   id                Int               @id @default(autoincrement())
   certificateNumber String            @unique
   requestNumber     String
+  certificateRequestId Int?
   clientId          Int
   partnerId         Int?
   sectorId          Int
@@ -142,6 +168,12 @@ model Certificate {
   width             Decimal?          @db.Decimal(10, 2)
   length            Decimal?          @db.Decimal(10, 2)
   totalArea         Decimal?          @db.Decimal(10, 2)
+  area              Decimal?          @db.Decimal(10, 2)
+  perimeter         Decimal?          @db.Decimal(10, 2)
+  additionalWidth   Decimal?          @db.Decimal(10, 2)
+  additionalLength  Decimal?          @db.Decimal(10, 2)
+  measurementModeUsed TerrainMeasurementMode @default(RECTANGULAR_AUTO)
+  legacyPayload     Json?
   mz                String?
   lot               String?
   north             String?
@@ -152,12 +184,31 @@ model Certificate {
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
-  client      Client  @relation("CertificateClient", fields: [clientId], references: [id])
-  partner     Client? @relation("CertificatePartner", fields: [partnerId], references: [id])
-  sector      Sector  @relation(fields: [sectorId], references: [id])
-  terrainType TerrainType @relation(fields: [terrainTypeId], references: [id])
-  user        User    @relation(fields: [userId], references: [id])
+  client              Client              @relation("CertificateClient", fields: [clientId], references: [id])
+  partner             Client?             @relation("CertificatePartner", fields: [partnerId], references: [id])
+  sector              Sector              @relation(fields: [sectorId], references: [id])
+  terrainType         TerrainType         @relation(fields: [terrainTypeId], references: [id])
+  user                User                @relation(fields: [userId], references: [id])
+  certificateRequest  CertificateRequest? @relation(fields: [certificateRequestId], references: [id])
+  owners              CertificateOwner[]
   assemblyRecordRequests AssemblyRecordRequest[]
+}
+
+model CertificateOwner {
+  id            Int      @id @default(autoincrement())
+  certificateId Int
+  clientId      Int
+  order         Int
+  source        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  certificate Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+  client      Client      @relation(fields: [clientId], references: [id])
+
+  @@unique([certificateId, order])
+  @@unique([certificateId, clientId])
+  @@index([clientId])
 }
 
 model AssemblyRecordRequest {

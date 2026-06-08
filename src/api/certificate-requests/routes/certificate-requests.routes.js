@@ -8,6 +8,7 @@ router.use(authRequired);
 
 router.get("/", certificateRequestsController.listCertificateRequests);
 router.get("/download/:filename", certificateRequestsController.downloadCertificateRequestPdf);
+router.get("/:id/delete-preview", certificateRequestsController.previewDeleteCertificateRequest);
 router.get("/:id", certificateRequestsController.getCertificateRequestById);
 router.post("/", certificateRequestsController.createCertificateRequest);
 router.put("/:id", certificateRequestsController.updateCertificateRequest);

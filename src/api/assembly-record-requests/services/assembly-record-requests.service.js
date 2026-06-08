@@ -1,6 +1,7 @@
 const prisma = require("../../../config/prisma");
 const HttpError = require("../../../utils/http-error");
 const { buildPaginationResult, getPaginationParams } = require("../../../utils/pagination");
+const { makeDeletionPreview } = require("../../../utils/deletion-preview");
 const { buildAssemblyRequestCode } = require("../utils/assembly-record-requests.utils");
 
 const nextCode = async () => {
@@ -65,6 +66,22 @@ const getAssemblyRecordRequestById = async (id) => {
   return request;
 };
 
+const getAssemblyRecordRequestDeletePreview = async (id) => {
+  const request = await prisma.assemblyRecordRequest.findUnique({
+    where: { id },
+    select: { code: true },
+  });
+
+  if (!request) {
+    throw new HttpError(404, "Solicitud de acta no encontrada");
+  }
+
+  return makeDeletionPreview({
+    entityLabel: "solicitud de acta",
+    itemName: request.code,
+  });
+};
+
 const getAssemblyRecordRequestByCode = async (code) => {
   const request = await prisma.assemblyRecordRequest.findUnique({
     where: { code },
@@ -122,7 +139,7 @@ const updateAssemblyRecordRequest = async (id, payload) => {
 };
 
 const deleteAssemblyRecordRequest = async (id) => {
-  await getAssemblyRecordRequestById(id);
+  await getAssemblyRecordRequestDeletePreview(id);
   await prisma.assemblyRecordRequest.delete({ where: { id } });
 };
 
@@ -133,4 +150,5 @@ module.exports = {
   createAssemblyRecordRequest,
   updateAssemblyRecordRequest,
   deleteAssemblyRecordRequest,
+  getAssemblyRecordRequestDeletePreview,
 };

@@ -10,10 +10,14 @@ const exportCertificatesReport = async (query) => {
     include: {
       client: true,
       partner: true,
+      owners: { include: { client: true }, orderBy: { order: "asc" } },
       sector: true,
       terrainType: true,
     },
-    orderBy: { certificateNumber: "desc" },
+    orderBy: [
+      { createdAt: "desc" },
+      { certificateNumber: "desc" },
+    ],
   });
 
   return buildCertificatesWorkbook(certificates);

@@ -1,6 +1,7 @@
 const prisma = require("../../../config/prisma");
 const HttpError = require("../../../utils/http-error");
 const { buildPaginationResult, getPaginationParams } = require("../../../utils/pagination");
+const { makeDeletionPreview, makeImpactItem } = require("../../../utils/deletion-preview");
 const { normalizeName } = require("../utils/sectors.utils");
 
 const listSectors = async (query) => {
@@ -38,6 +39,32 @@ const getSectorById = async (id) => {
   return sector;
 };
 
+const getSectorDeletePreview = async (id) => {
+  const sector = await prisma.sector.findUnique({
+    where: { id },
+    select: {
+      name: true,
+      _count: {
+        select: {
+          certificates: true,
+        },
+      },
+    },
+  });
+
+  if (!sector) {
+    throw new HttpError(404, "Sector no encontrado");
+  }
+
+  return makeDeletionPreview({
+    entityLabel: "sector",
+    itemName: sector.name,
+    willBlock: sector._count.certificates > 0
+      ? [makeImpactItem({ label: "Certificados asociados", count: sector._count.certificates })]
+      : [],
+  });
+};
+
 const createSector = async ({ name }) => {
   return prisma.sector.create({
     data: { name: normalizeName(name) },
@@ -53,13 +80,17 @@ const updateSector = async (id, { name }) => {
 };
 
 const deleteSector = async (id) => {
-  await getSectorById(id);
+  const preview = await getSectorDeletePreview(id);
+  if (!preview.canDelete) {
+    throw new HttpError(409, "No se puede eliminar el sector porque tiene certificados asociados");
+  }
   await prisma.sector.delete({ where: { id } });
 };
 
 module.exports = {
   listSectors,
   getSectorById,
+  getSectorDeletePreview,
   createSector,
   updateSector,
   deleteSector,

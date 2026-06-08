@@ -37,10 +37,16 @@ const deleteTerrainType = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
+const previewDeleteTerrainType = asyncHandler(async (req, res) => {
+  const preview = await terrainTypesService.getTerrainTypeDeletePreview(Number(req.params.id));
+  res.json(preview);
+});
+
 module.exports = {
   listTerrainTypes,
   getTerrainTypeById,
   createTerrainType,
   updateTerrainType,
   deleteTerrainType,
+  previewDeleteTerrainType,
 };

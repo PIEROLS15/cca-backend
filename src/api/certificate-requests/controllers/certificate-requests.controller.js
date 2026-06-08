@@ -46,6 +46,11 @@ const deleteCertificateRequest = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
+const previewDeleteCertificateRequest = asyncHandler(async (req, res) => {
+  const preview = await certificateRequestsService.getCertificateRequestDeletePreview(Number(req.params.id));
+  res.json(preview);
+});
+
 const downloadCertificateRequestPdf = asyncHandler(async (req, res) => {
   const filename = req.params.filename || "";
   const requestNumber = filename.replace(/^solicitud-certificado-/, "").replace(/\.pdf$/, "");
@@ -66,5 +71,6 @@ module.exports = {
   createCertificateRequest,
   updateCertificateRequest,
   deleteCertificateRequest,
+  previewDeleteCertificateRequest,
   downloadCertificateRequestPdf,
 };
