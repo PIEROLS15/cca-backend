@@ -60,6 +60,11 @@ const previewAssemblyRecordRequest = asyncHandler(async (req, res) => {
   });
 });
 
+const previewDeleteAssemblyRecordRequest = asyncHandler(async (req, res) => {
+  const preview = await assemblyRecordRequestsService.getAssemblyRecordRequestDeletePreview(Number(req.params.id));
+  res.json(preview);
+});
+
 const downloadAssemblyRecordRequestPdf = asyncHandler(async (req, res) => {
   const request = await assemblyRecordRequestsService.getAssemblyRecordRequestById(Number(req.params.id));
   const pdfBuffer = await buildAssemblyRecordRequestPdf(request);
@@ -87,6 +92,7 @@ module.exports = {
   updateAssemblyRecordRequest,
   deleteAssemblyRecordRequest,
   previewAssemblyRecordRequest,
+  previewDeleteAssemblyRecordRequest,
   downloadAssemblyRecordRequestPdf,
   downloadAssemblyRecordRequestPdfByFilename,
 };

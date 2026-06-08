@@ -37,10 +37,16 @@ const deleteSector = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
+const previewDeleteSector = asyncHandler(async (req, res) => {
+  const preview = await sectorsService.getSectorDeletePreview(Number(req.params.id));
+  res.json(preview);
+});
+
 module.exports = {
   listSectors,
   getSectorById,
   createSector,
   updateSector,
   deleteSector,
+  previewDeleteSector,
 };

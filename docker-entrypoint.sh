@@ -1,6 +1,17 @@
 #!/bin/sh
 set -e
 
+MIGRATIONS_DIR="prisma/migrations"
+
+has_migrations() {
+  [ -d "$MIGRATIONS_DIR" ] && [ -n "$(find "$MIGRATIONS_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -n 1)" ]
+}
+
+if ! has_migrations; then
+  echo "No migration folders found. Creating initial migration..."
+  npx prisma migrate dev --name init --skip-seed
+fi
+
 echo "Running database migrations..."
 npx prisma migrate deploy
 

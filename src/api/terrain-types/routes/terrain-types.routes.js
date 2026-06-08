@@ -7,6 +7,7 @@ const router = express.Router();
 router.use(authRequired);
 
 router.get("/", terrainTypesController.listTerrainTypes);
+router.get("/:id/delete-preview", terrainTypesController.previewDeleteTerrainType);
 router.get("/:id", terrainTypesController.getTerrainTypeById);
 router.post("/", terrainTypesController.createTerrainType);
 router.put("/:id", terrainTypesController.updateTerrainType);

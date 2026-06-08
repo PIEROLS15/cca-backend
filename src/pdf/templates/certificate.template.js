@@ -13,7 +13,7 @@ const monthNames = [
 
 const toDisplayDate = (value) => {
   const date = value ? new Date(value) : new Date();
-  return `ASIA, ${date.getDate()} DE ${monthNames[date.getMonth()]} DEL ${date.getFullYear()}`;
+  return `${date.getDate()} DE ${monthNames[date.getMonth()]} DEL ${date.getFullYear()}`;
 };
 
 const toQrBuffer = (value) =>

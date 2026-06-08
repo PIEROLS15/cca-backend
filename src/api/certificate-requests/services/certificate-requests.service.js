@@ -1,6 +1,7 @@
 const prisma = require("../../../config/prisma");
 const HttpError = require("../../../utils/http-error");
 const { buildPaginationResult, getPaginationParams } = require("../../../utils/pagination");
+const { makeDeletionPreview, makeImpactItem } = require("../../../utils/deletion-preview");
 const {
   buildRequestNumber,
   normalizeCertificateTypes,
@@ -82,6 +83,32 @@ const getCertificateRequestById = async (identifier) => {
   }
 
   return formatCertificateRequestResponse(request);
+};
+
+const getCertificateRequestDeletePreview = async (id) => {
+  const request = await prisma.certificateRequest.findUnique({
+    where: { id },
+    select: {
+      requestNumber: true,
+      _count: {
+        select: {
+          certificates: true,
+        },
+      },
+    },
+  });
+
+  if (!request) {
+    throw new HttpError(404, "Solicitud de certificado no encontrada");
+  }
+
+  return makeDeletionPreview({
+    entityLabel: "solicitud de certificado",
+    itemName: request.requestNumber,
+    willSetNull: request._count.certificates > 0
+      ? [makeImpactItem({ label: "Certificados vinculados", count: request._count.certificates })]
+      : [],
+  });
 };
 
 const createCertificateRequest = async (payload, userId) => {
@@ -219,10 +246,7 @@ const updateCertificateRequest = async (id, payload) => {
 };
 
 const deleteCertificateRequest = async (id) => {
-  const request = await prisma.certificateRequest.findUnique({ where: { id } });
-  if (!request) {
-    throw new HttpError(404, "Solicitud de certificado no encontrada");
-  }
+  await getCertificateRequestDeletePreview(id);
   await prisma.certificateRequest.delete({ where: { id } });
 };
 
@@ -232,4 +256,5 @@ module.exports = {
   createCertificateRequest,
   updateCertificateRequest,
   deleteCertificateRequest,
+  getCertificateRequestDeletePreview,
 };

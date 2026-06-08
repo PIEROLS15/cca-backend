@@ -2,6 +2,9 @@ const BEARER_TOKEN = process.env.BEARER_TOKEN;
 const API_URL = `${process.env.API_BASE_URL}/backend-certificado/request-meeting-minutes`;
 const ADVANCED_URL = `${process.env.API_BASE_URL}/backend-certificado/certificate/advanced`;
 const PAGE_LIMIT = 50;
+const { mapRemoteCertificateMeasurements } = require("./certificate-measurements");
+const { buildRequestLookup, resolveRequestNumberForCertificate } = require("./certificate-request-reconciliation");
+const { collectLegacyOwnerCandidates, buildCertificateOwnerRecords } = require("./certificate-owners");
 
 const STATUS_MAP = {
   "por firmar": "PorFirmar",
@@ -102,12 +105,23 @@ async function seedAssemblyRecordRequests(prisma) {
   const totalPages = firstPage.totalPages || 1;
   console.log(`  ℹ ${firstPage.totalDocs} solicitudes en ${totalPages} páginas`);
 
-  const [sectorByName, terrainTypeByName, userByDni, allClients] = await Promise.all([
+  const [sectorByName, terrainTypeByName, userByDni, allClients, requests] = await Promise.all([
     prisma.sector.findMany({ select: { id: true, name: true } }).then((r) => new Map(r.map((s) => [s.name.toLowerCase().trim(), s.id]))),
     prisma.terrainType.findMany({ select: { id: true, name: true } }).then((r) => new Map(r.map((t) => [t.name.toLowerCase().trim(), t.id]))),
     prisma.user.findMany({ select: { id: true, dni: true } }).then((r) => new Map(r.filter((u) => u.dni).map((u) => [u.dni, u.id]))),
     prisma.client.findMany({ select: { id: true, documentNumber: true } }),
+    prisma.certificateRequest.findMany({
+      select: {
+        id: true,
+        requestNumber: true,
+        createdAt: true,
+        sectorLocation: true,
+        client: { select: { documentNumber: true, fullName: true } },
+        partner: { select: { documentNumber: true, fullName: true } },
+      },
+    }),
   ]);
+  const requestLookup = buildRequestLookup(requests);
   const clientByDoc = new Map(allClients.map((c) => [c.documentNumber, c.id]));
 
   let certByNumber = new Map(
@@ -136,6 +150,20 @@ async function seedAssemblyRecordRequests(prisma) {
   let skipped = 0;
   let certsRecovered = 0;
   const seen = new Set();
+
+  async function syncCertificateOwners(tx, certificateId, ownerRecords) {
+    await tx.certificateOwner.deleteMany({ where: { certificateId } });
+    if (ownerRecords.length === 0) return;
+
+    await tx.certificateOwner.createMany({
+      data: ownerRecords.map((owner) => ({
+        certificateId,
+        clientId: owner.clientId,
+        order: owner.order,
+        source: owner.source,
+      })),
+    });
+  }
 
   for (const doc of allDocs) {
     if (!doc._id) {
@@ -188,30 +216,72 @@ async function seedAssemblyRecordRequests(prisma) {
         const status = STATUS_MAP[rawDoc.status?.trim().toLowerCase()] || "PorFirmar";
 
         try {
-          const newCert = await prisma.certificate.create({
-            data: {
-              certificateNumber: certId,
-              requestNumber: rawDoc.nroSolicitud?.trim() || "",
-              clientId: client.id,
-              partnerId: null,
-              sectorId,
-              terrainTypeId,
-              userId: userId || 1,
-              width: rawDoc.anchoArea ? parseFloat(rawDoc.anchoArea) : null,
-              length: rawDoc.largoArea ? parseFloat(rawDoc.largoArea) : null,
-              totalArea: rawDoc.totalArea ? parseFloat(rawDoc.totalArea) : null,
-              mz: rawDoc.mz?.trim() || null,
-              lot: rawDoc.lote?.trim() || null,
-              north: rawDoc.colindanciaNorte?.trim() || null,
-              south: rawDoc.colindanciaSur?.trim() || null,
-              east: rawDoc.colindanciaEste?.trim() || null,
-              west: rawDoc.colindanciaOeste?.trim() || null,
-              status,
-              createdAt: new Date(rawDoc.createdAt),
-              updatedAt: new Date(rawDoc.updatedAt),
-            },
+          const measurements = mapRemoteCertificateMeasurements(rawDoc);
+          const { requestNumber, certificateRequestId } = resolveRequestNumberForCertificate({
+            rawRequestNumber: rawDoc.nroSolicitud,
+            certificateNumber: certId,
+            clientDocumentNumber: normalizeDni(rawDoc.dni),
+            sectorName: rawDoc.sectorLocation,
+            mz: rawDoc.mz,
+            lot: rawDoc.lote,
+            createdAt: rawDoc.createdAt,
+          }, requestLookup);
+
+          const linkedRequest = certificateRequestId ? requestLookup.requestById.get(certificateRequestId) || null : null;
+          const ownerCandidates = collectLegacyOwnerCandidates(rawDoc, linkedRequest, normalizeDni);
+          for (const candidate of ownerCandidates) {
+            if (!candidate.documentNumber || clientByDoc.get(candidate.documentNumber)) continue;
+            const fallbackClient = await findOrCreateClient(prisma, candidate.documentNumber, candidate.fullName, new Date(rawDoc.createdAt));
+            if (fallbackClient) {
+              clientByDoc.set(candidate.documentNumber, fallbackClient.id);
+            }
+          }
+
+          const ownerRecords = buildCertificateOwnerRecords(rawDoc, linkedRequest, clientByDoc, normalizeDni);
+          if (ownerRecords.length === 0) {
+            skipped++;
+            console.warn(`  ⚠ Cert ${certId}: sin dueños válidos, acta omitida`);
+            continue;
+          }
+
+          const primaryOwner = ownerRecords[0];
+          const partnerOwner = ownerRecords[1] || null;
+          const newCert = await prisma.$transaction(async (tx) => {
+            const created = await tx.certificate.create({
+              data: {
+                certificateNumber: certId,
+                requestNumber,
+                certificateRequestId,
+                clientId: primaryOwner.clientId,
+                partnerId: partnerOwner ? partnerOwner.clientId : null,
+                sectorId,
+                terrainTypeId,
+                userId: userId || 1,
+                width: measurements.width,
+                length: measurements.length,
+                totalArea: measurements.totalArea,
+                area: measurements.area,
+                perimeter: measurements.perimeter,
+                additionalWidth: measurements.additionalWidth,
+                additionalLength: measurements.additionalLength,
+                measurementModeUsed: measurements.measurementModeUsed,
+                mz: rawDoc.mz?.trim() || null,
+                lot: rawDoc.lote?.trim() || null,
+                north: rawDoc.colindanciaNorte?.trim() || null,
+                south: rawDoc.colindanciaSur?.trim() || null,
+                east: rawDoc.colindanciaEste?.trim() || null,
+                west: rawDoc.colindanciaOeste?.trim() || null,
+                legacyPayload: rawDoc,
+                status,
+                createdAt: new Date(rawDoc.createdAt),
+                updatedAt: new Date(rawDoc.updatedAt),
+              },
+              select: { id: true },
+            });
+            await syncCertificateOwners(tx, created.id, ownerRecords);
+            return created;
           });
-          cert = { id: newCert.id, certificateNumber: certId, clientId: client.id };
+          cert = { id: newCert.id, certificateNumber: certId, clientId: primaryOwner.clientId };
           certByNumber.set(certId, cert);
           certsRecovered++;
           console.warn(`  ✓ Certificado recuperado: ${certId} (${rawDoc.nameLastSecondName})`);

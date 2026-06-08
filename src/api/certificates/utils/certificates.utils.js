@@ -12,28 +12,71 @@ const CERTIFICATE_STATUS_FROM_DB = {
   Entregado: "Entregado",
 };
 
+const {
+  TERRAIN_MEASUREMENT_MODES,
+} = require("../../../constants/terrain-type-configs");
+const { formatTerrainTypeConfig } = require("../../terrain-types/utils/terrain-types.utils");
+
 const normalizeCertificateStatus = (value) => CERTIFICATE_STATUS_TO_DB[value] || null;
+
+const normalizeTerrainMeasurementMode = (value) => {
+  if (!value) return null;
+  return Object.values(TERRAIN_MEASUREMENT_MODES).includes(value) ? value : null;
+};
+
+const deriveTerrainMeasurementMode = (terrain = {}) => {
+  const hasAreaPerimeter = terrain.area != null || terrain.perimeter != null;
+  const hasWidthOrLength = terrain.width != null || terrain.length != null;
+  const hasTotalArea = terrain.totalArea != null;
+
+  if (hasAreaPerimeter) return TERRAIN_MEASUREMENT_MODES.AREA_PERIMETER;
+  if (!hasWidthOrLength && hasTotalArea) return TERRAIN_MEASUREMENT_MODES.MANUAL_TOTAL_AREA;
+  return TERRAIN_MEASUREMENT_MODES.RECTANGULAR_AUTO;
+};
 
 const formatCertificateStatus = (value) => CERTIFICATE_STATUS_FROM_DB[value] || value;
 
 const decimalToNumber = (value) => (value ? Number(value) : null);
 
 const formatCertificateResponse = (certificate) => {
-  const owners = [];
-  if (certificate.client) owners.push({ id: certificate.client.id, fullName: certificate.client.fullName, documentNumber: certificate.client.documentNumber });
-  if (certificate.partner) owners.push({ id: certificate.partner.id, fullName: certificate.partner.fullName, documentNumber: certificate.partner.documentNumber });
+  const owners = Array.isArray(certificate.owners) && certificate.owners.length > 0
+    ? certificate.owners.map((owner) => ({
+        id: owner.client?.id || null,
+        fullName: owner.client?.fullName || "",
+        documentNumber: owner.client?.documentNumber || "",
+        order: owner.order,
+        source: owner.source || null,
+      }))
+    : [];
+
+  if (owners.length === 0) {
+    if (certificate.client) owners.push({ id: certificate.client.id, fullName: certificate.client.fullName, documentNumber: certificate.client.documentNumber, order: 1, source: "certificate.client" });
+    if (certificate.partner) owners.push({ id: certificate.partner.id, fullName: certificate.partner.fullName, documentNumber: certificate.partner.documentNumber, order: 2, source: "certificate.partner" });
+  }
 
   return {
     id: certificate.id,
+    certificateRequestId: certificate.certificateRequestId || null,
     owners,
     terrain: {
       terrainType: certificate.terrainType
-        ? { id: certificate.terrainType.id, name: certificate.terrainType.name }
+        ? {
+          id: certificate.terrainType.id,
+          name: certificate.terrainType.name,
+          terrainTypeConfigId: certificate.terrainType.terrainTypeConfigId,
+          config: formatTerrainTypeConfig(certificate.terrainType.config),
+        }
         : null,
       width: decimalToNumber(certificate.width),
       length: decimalToNumber(certificate.length),
       totalArea: decimalToNumber(certificate.totalArea),
+      area: decimalToNumber(certificate.area),
+      perimeter: decimalToNumber(certificate.perimeter),
+      additionalWidth: decimalToNumber(certificate.additionalWidth),
+      additionalLength: decimalToNumber(certificate.additionalLength),
+      measurementModeUsed: certificate.measurementModeUsed,
     },
+    legacyPayload: certificate.legacyPayload || null,
     location: {
       sectors: certificate.sector
         ? { id: certificate.sector.id, name: certificate.sector.name }
@@ -90,6 +133,10 @@ const buildCertificateFilters = (query) => {
     where.terrainTypeId = Number(query.terrainTypeId);
   }
 
+  if (query.createdByRoleId) {
+    where.user = { roleId: Number(query.createdByRoleId) };
+  }
+
   if (query.search) {
     const s = query.search;
     const clientSearch = {
@@ -104,6 +151,7 @@ const buildCertificateFilters = (query) => {
           { certificateNumber: { contains: s, mode: "insensitive" } },
           { client: clientSearch },
           { partner: clientSearch },
+          { owners: { some: { client: clientSearch } } },
         ],
       },
     ];
@@ -119,10 +167,11 @@ const buildCertificateFilters = (query) => {
     where.AND = [
       ...existingAND,
       {
-        OR: [
-          clientFilter ? { client: clientFilter } : undefined,
-          clientFilter ? { partner: clientFilter } : undefined,
-        ].filter(Boolean),
+      OR: [
+        clientFilter ? { client: clientFilter } : undefined,
+        clientFilter ? { partner: clientFilter } : undefined,
+        clientFilter ? { owners: { some: { client: clientFilter } } } : undefined,
+      ].filter(Boolean),
       },
     ];
   }
@@ -132,6 +181,8 @@ const buildCertificateFilters = (query) => {
 
 module.exports = {
   normalizeCertificateStatus,
+  normalizeTerrainMeasurementMode,
+  deriveTerrainMeasurementMode,
   formatCertificateStatus,
   formatCertificateResponse,
   buildCertificateFilters,

@@ -8,6 +8,7 @@ const router = express.Router();
 router.use(authRequired, requireRoles("Admin", "Presidente"));
 
 router.get("/", rolesController.listRoles);
+router.get("/:id/delete-preview", rolesController.previewDeleteRole);
 router.get("/:id", rolesController.getRoleById);
 router.post("/", rolesController.createRole);
 router.put("/:id", rolesController.updateRole);

@@ -48,10 +48,16 @@ const deleteRole = asyncHandler(async (req, res) => {
   });
 });
 
+const previewDeleteRole = asyncHandler(async (req, res) => {
+  const preview = await rolesService.getRoleDeletePreview(Number(req.params.id));
+  res.json(preview);
+});
+
 module.exports = {
   listRoles,
   getRoleById,
   createRole,
   updateRole,
   deleteRole,
+  previewDeleteRole,
 };

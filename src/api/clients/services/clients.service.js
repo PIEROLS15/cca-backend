@@ -2,6 +2,7 @@ const { Prisma } = require("@prisma/client");
 const prisma = require("../../../config/prisma");
 const HttpError = require("../../../utils/http-error");
 const { buildPaginationResult, getPaginationParams } = require("../../../utils/pagination");
+const { makeDeletionPreview, makeImpactItem } = require("../../../utils/deletion-preview");
 const {
   buildClientWriteData,
   formatClientCollection,
@@ -94,6 +95,61 @@ const getClientById = async (id) => {
   return formatClientResponse(await getClientRecordById(id));
 };
 
+const getClientDeletePreview = async (id) => {
+  const client = await prisma.client.findUnique({
+    where: { id },
+    select: {
+      fullName: true,
+      documentNumber: true,
+      commoner: true,
+      _count: {
+        select: {
+          certificates: true,
+          partnerCertificates: true,
+          certificateRequests: true,
+          partnerRequests: true,
+          assemblyRecordRequests: true,
+          certificateOwners: true,
+        },
+      },
+    },
+  });
+
+  if (!client) {
+    throw new HttpError(404, "Cliente no encontrado");
+  }
+
+  return makeDeletionPreview({
+    entityLabel: "cliente",
+    itemName: `${client.fullName} (${client.documentNumber})`,
+    willDelete: client.commoner
+      ? [makeImpactItem({ label: "Ficha de comunero", count: 1 })]
+      : [],
+    willSetNull: [
+      ...(client._count.partnerCertificates > 0
+        ? [makeImpactItem({ label: "Certificados donde figura como copropietario", count: client._count.partnerCertificates })]
+        : []),
+      ...(client._count.partnerRequests > 0
+        ? [makeImpactItem({ label: "Solicitudes de certificado donde figura como copropietario", count: client._count.partnerRequests })]
+        : []),
+    ],
+    willBlock: [
+      ...(client._count.certificates > 0
+        ? [makeImpactItem({ label: "Certificados donde es titular", count: client._count.certificates })]
+        : []),
+      ...(client._count.certificateRequests > 0
+        ? [makeImpactItem({ label: "Solicitudes de certificado donde es titular", count: client._count.certificateRequests })]
+        : []),
+      ...(client._count.assemblyRecordRequests > 0
+        ? [makeImpactItem({ label: "Solicitudes de acta vinculadas", count: client._count.assemblyRecordRequests })]
+        : []),
+      ...(client._count.certificateOwners > 0
+        ? [makeImpactItem({ label: "Registros de propietario en certificados", count: client._count.certificateOwners })]
+        : []),
+    ],
+  });
+};
+
 const createClient = async (payload) => {
   return runClientWriteTransaction(async (tx) => {
     const data = await buildClientWriteData(tx, payload);
@@ -149,11 +205,9 @@ const upsertClientByDocument = async (documentNumber, payload) => {
 };
 
 const deleteClient = async (id) => {
-  await getClientRecordById(id);
-
-  const requestsCount = await prisma.certificateRequest.count({ where: { clientId: id } });
-  if (requestsCount > 0) {
-    throw new HttpError(409, "No se puede eliminar: el cliente tiene solicitudes asociadas");
+  const preview = await getClientDeletePreview(id);
+  if (!preview.canDelete) {
+    throw new HttpError(409, "No se puede eliminar el cliente porque tiene dependencias asociadas");
   }
 
   await prisma.client.delete({ where: { id } });
@@ -179,5 +233,6 @@ module.exports = {
   updateClient,
   upsertClientByDocument,
   deleteClient,
+  getClientDeletePreview,
   searchByDocument,
 };
