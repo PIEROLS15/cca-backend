@@ -4,6 +4,7 @@ const PAGE_LIMIT = 200;
 const { mapRemoteCertificateMeasurements } = require("./certificate-measurements");
 const { buildRequestLookup, resolveRequestNumberForCertificate } = require("./certificate-request-reconciliation");
 const { collectLegacyOwnerCandidates, buildCertificateOwnerRecords } = require("./certificate-owners");
+const { buildCertificateVerificationSnapshot } = require("../../src/api/certificates/utils/certificate-verification.utils");
 
 const ROLES_TO_TRY = ["presidente", "superadmin", "secretaria", "admin", "asistente"];
 
@@ -297,6 +298,32 @@ async function seedCertificates(prisma) {
       east: doc.colindanciaEste?.trim() || null,
       west: doc.colindanciaOeste?.trim() || null,
       legacyPayload: doc,
+      issuedSnapshot: buildCertificateVerificationSnapshot({
+        certificateNumber,
+        owners: ownerRecords.map((owner) => ({
+          fullName: owner.fullName,
+          documentNumber: owner.documentNumber,
+        })),
+        terrain: {
+          terrainType: { name: terrainName },
+          width: measurements.width,
+          length: measurements.length,
+          totalArea: measurements.totalArea,
+          area: measurements.area,
+          perimeter: measurements.perimeter,
+          additionalWidth: measurements.additionalWidth,
+          additionalLength: measurements.additionalLength,
+        },
+        sector: sectorName,
+        location: { mz: doc.mz?.trim() || null, lot: doc.lote?.trim() || null },
+        borders: {
+          north: doc.colindanciaNorte?.trim() || null,
+          south: doc.colindanciaSur?.trim() || null,
+          east: doc.colindanciaEste?.trim() || null,
+          west: doc.colindanciaOeste?.trim() || null,
+        },
+        createdAt: new Date(doc.createdAt),
+      }),
       status,
       createdAt: new Date(doc.createdAt),
       updatedAt: new Date(doc.updatedAt),

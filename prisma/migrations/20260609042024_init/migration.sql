@@ -135,6 +135,7 @@ CREATE TABLE "CertificateRequest" (
 CREATE TABLE "Certificate" (
     "id" SERIAL NOT NULL,
     "certificateNumber" TEXT NOT NULL,
+    "verificationToken" TEXT NOT NULL,
     "requestNumber" TEXT NOT NULL,
     "certificateRequestId" INTEGER,
     "clientId" INTEGER NOT NULL,
@@ -151,6 +152,7 @@ CREATE TABLE "Certificate" (
     "additionalLength" DECIMAL(10,2),
     "measurementModeUsed" "TerrainMeasurementMode" NOT NULL DEFAULT 'RECTANGULAR_AUTO',
     "legacyPayload" JSONB,
+    "issuedSnapshot" JSONB,
     "mz" TEXT,
     "lot" TEXT,
     "north" TEXT,
@@ -229,6 +231,9 @@ CREATE UNIQUE INDEX "CertificateRequest_requestNumber_key" ON "CertificateReques
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Certificate_certificateNumber_key" ON "Certificate"("certificateNumber");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Certificate_verificationToken_key" ON "Certificate"("verificationToken");
 
 -- CreateIndex
 CREATE INDEX "CertificateOwner_clientId_idx" ON "CertificateOwner"("clientId");

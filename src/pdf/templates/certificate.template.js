@@ -1,5 +1,6 @@
 const PDFDocument = require("pdfkit");
 const bwipjs = require("bwip-js");
+const { buildCertificateVerificationUrl } = require("../../api/certificates/utils/certificate-verification.utils");
 
 const WIDTH = 595.28;
 const HEIGHT = 841.89;
@@ -75,6 +76,7 @@ const buildCertificatePdf = async (certificate) => {
       const area = a != null ? `${Number(a).toFixed(2)}` : "";
       const dateStr = toDisplayDate(certificate.createdAt);
       const code = certificate.certificateNumber || "";
+      const qrValue = buildCertificateVerificationUrl(certificate.verificationToken || certificate.certificateNumber || code);
       const bodyWidth = 495;
       const leftMargin = 50;
 
@@ -189,7 +191,7 @@ const buildCertificatePdf = async (certificate) => {
       doc.font("Times-Roman").fontSize(12).fillColor("#000000");
       doc.text(dateStr, leftMargin, fechaY, { width: textWidthSinQR, align: "right" });
 
-      const qrBuffer = await toQrBuffer(code);
+      const qrBuffer = await toQrBuffer(qrValue);
       doc.image(qrBuffer, qrX, qrY, { fit: [qrSize, qrSize] });
 
       drawCodeGrid(doc, code);

@@ -20,11 +20,11 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/prisma ./prisma
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 
 COPY src ./src
 COPY package.json ./
 
 EXPOSE 9001
 
-ENTRYPOINT ["/docker-entrypoint.sh"]
+ENTRYPOINT ["sh", "/docker-entrypoint.sh"]

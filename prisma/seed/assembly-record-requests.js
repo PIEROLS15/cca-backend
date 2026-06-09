@@ -5,6 +5,7 @@ const PAGE_LIMIT = 50;
 const { mapRemoteCertificateMeasurements } = require("./certificate-measurements");
 const { buildRequestLookup, resolveRequestNumberForCertificate } = require("./certificate-request-reconciliation");
 const { collectLegacyOwnerCandidates, buildCertificateOwnerRecords } = require("./certificate-owners");
+const { buildCertificateVerificationSnapshot } = require("../../src/api/certificates/utils/certificate-verification.utils");
 
 const STATUS_MAP = {
   "por firmar": "PorFirmar",
@@ -272,6 +273,32 @@ async function seedAssemblyRecordRequests(prisma) {
                 east: rawDoc.colindanciaEste?.trim() || null,
                 west: rawDoc.colindanciaOeste?.trim() || null,
                 legacyPayload: rawDoc,
+                issuedSnapshot: buildCertificateVerificationSnapshot({
+                  certificateNumber: certId,
+                  owners: ownerRecords.map((owner) => ({
+                    fullName: owner.fullName,
+                    documentNumber: owner.documentNumber,
+                  })),
+                  terrain: {
+                    terrainType: { name: terrainName },
+                    width: measurements.width,
+                    length: measurements.length,
+                    totalArea: measurements.totalArea,
+                    area: measurements.area,
+                    perimeter: measurements.perimeter,
+                    additionalWidth: measurements.additionalWidth,
+                    additionalLength: measurements.additionalLength,
+                  },
+                  sector: sectorName,
+                  location: { mz: rawDoc.mz?.trim() || null, lot: rawDoc.lote?.trim() || null },
+                  borders: {
+                    north: rawDoc.colindanciaNorte?.trim() || null,
+                    south: rawDoc.colindanciaSur?.trim() || null,
+                    east: rawDoc.colindanciaEste?.trim() || null,
+                    west: rawDoc.colindanciaOeste?.trim() || null,
+                  },
+                  createdAt: new Date(rawDoc.createdAt),
+                }),
                 status,
                 createdAt: new Date(rawDoc.createdAt),
                 updatedAt: new Date(rawDoc.updatedAt),

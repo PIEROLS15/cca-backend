@@ -158,6 +158,7 @@ model CertificateRequest {
 model Certificate {
   id                Int               @id @default(autoincrement())
   certificateNumber String            @unique
+  verificationToken String            @unique @default(cuid())
   requestNumber     String
   certificateRequestId Int?
   clientId          Int
@@ -174,6 +175,7 @@ model Certificate {
   additionalLength  Decimal?          @db.Decimal(10, 2)
   measurementModeUsed TerrainMeasurementMode @default(RECTANGULAR_AUTO)
   legacyPayload     Json?
+  issuedSnapshot    Json?
   mz                String?
   lot               String?
   north             String?

@@ -11,6 +11,7 @@ const certificatesRoutes = require("./certificates/routes/certificates.routes");
 const assemblyRecordRequestsRoutes = require("./assembly-record-requests/routes/assembly-record-requests.routes");
 const dashboardRoutes = require("./dashboard/routes/dashboard.routes");
 const reportsRoutes = require("./reports/routes/reports.routes");
+const publicRoutes = require("./public/routes/public.routes");
 
 const router = express.Router();
 
@@ -25,5 +26,6 @@ router.use("/certificates", certificatesRoutes);
 router.use("/assembly-record-requests", assemblyRecordRequestsRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/reports", reportsRoutes);
+router.use("/public", publicRoutes);
 
 module.exports = router;
