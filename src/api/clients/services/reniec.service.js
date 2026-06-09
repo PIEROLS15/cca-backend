@@ -1,8 +1,39 @@
 const HttpError = require("../../../utils/http-error");
 
+const titleCase = (value) => String(value || "")
+  .trim()
+  .toLowerCase()
+  .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const normalizeAddress = (value) => {
+  const address = String(value || "").trim();
+  return address.toLowerCase() === "data in credit" ? "" : address;
+};
+
+const getReniecConfig = () => {
+  const provider = String(process.env.RENIEC_PROVIDER || "codart").toLowerCase();
+
+  if (provider === "codart") {
+    return {
+      provider,
+      token: process.env.RENIEC_CODART_TOKEN || process.env.RENIEC_TOKEN,
+      baseUrl: process.env.RENIEC_CODART_URL || process.env.API_RENIEC_DNI,
+    };
+  }
+
+  if (provider === "decolecta") {
+    return {
+      provider,
+      token: process.env.RENIEC_DECOLECTA_TOKEN,
+      baseUrl: process.env.RENIEC_DECOLECTA_URL,
+    };
+  }
+
+  throw new HttpError(500, "Proveedor RENIEC no soportado");
+};
+
 const searchByDocument = async (documentNumber) => {
-  const token = process.env.RENIEC_TOKEN;
-  const baseUrl = process.env.API_RENIEC_DNI;
+  const { token, baseUrl } = getReniecConfig();
 
   if (!token || !baseUrl) {
     throw new HttpError(500, "RENIEC no configurado");
@@ -23,17 +54,22 @@ const searchByDocument = async (documentNumber) => {
   }
 
   const data = await response.json();
+  if (data?.success === false) {
+    throw new HttpError(404, data?.message || "No se encontraron datos para el DNI ingresado");
+  }
 
-  const fullName = [data.first_name, data.first_last_name, data.second_last_name]
+  const result = data?.result ?? data;
+
+  const fullName = [result.first_name, result.first_last_name, result.second_last_name]
     .filter(Boolean)
     .join(" ")
-    .toLowerCase()
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+    || result.full_name
+    || "";
 
   return {
-    fullName: fullName || data.full_name || "",
-    documentNumber: data.document_number || documentNumber,
-    address: "",
+    fullName: titleCase(fullName),
+    documentNumber: result.document_number || documentNumber,
+    address: normalizeAddress(result.address),
   };
 };
 
