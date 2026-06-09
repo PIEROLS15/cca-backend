@@ -52,7 +52,7 @@ const getClientRecordById = async (id, db = prisma) => {
   return client;
 };
 
-const listClients = async ({ clientType, page, limit, search }) => {
+const listClients = async ({ clientType, page, limit, search, documentNumber }) => {
   const pagination = getPaginationParams({ page, limit });
 
   const where = {};
@@ -64,10 +64,21 @@ const listClients = async ({ clientType, page, limit, search }) => {
   }
 
   if (search) {
-    where.OR = [
+    const searchOr = [
       { fullName: { contains: search, mode: "insensitive" } },
       { documentNumber: { contains: search, mode: "insensitive" } },
     ];
+
+    const normalizedSearch = String(search).trim();
+    if (/^\d+$/.test(normalizedSearch)) {
+      searchOr.push({ commoner: { is: { licenseSequence: Number(normalizedSearch) } } });
+    }
+
+    where.OR = searchOr;
+  }
+
+  if (documentNumber) {
+    where.documentNumber = { contains: documentNumber, mode: "insensitive" };
   }
 
   const [docs, total] = await Promise.all([
