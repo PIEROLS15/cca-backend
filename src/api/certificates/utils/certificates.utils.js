@@ -56,6 +56,7 @@ const formatCertificateResponse = (certificate) => {
 
   return {
     id: certificate.id,
+    verificationToken: certificate.verificationToken || null,
     certificateRequestId: certificate.certificateRequestId || null,
     owners,
     terrain: {
@@ -77,6 +78,7 @@ const formatCertificateResponse = (certificate) => {
       measurementModeUsed: certificate.measurementModeUsed,
     },
     legacyPayload: certificate.legacyPayload || null,
+    issuedSnapshot: certificate.issuedSnapshot || null,
     location: {
       sectors: certificate.sector
         ? { id: certificate.sector.id, name: certificate.sector.name }
