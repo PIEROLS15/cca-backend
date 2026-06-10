@@ -125,6 +125,7 @@ CREATE TABLE "CertificateRequest" (
     "certificateTypes" JSONB,
     "exposure" TEXT,
     "attachments" JSONB,
+    "legacyPayload" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

@@ -1,53 +1,28 @@
 const { formatClientResponse } = require("../../clients/utils/clients.utils");
+const {
+  normalizeAttachments,
+  normalizeCertificateTypes,
+  normalizeRequestDestination,
+} = require("./certificate-request-legacy.utils");
 
 const buildRequestNumber = (sequence, date = new Date()) => {
   const year = String(date.getFullYear()).slice(-2);
   return `${String(sequence).padStart(6, "0")}-${year}`;
 };
 
-const normalizeValueToken = (value) => {
-  if (!value) {
-    return "";
-  }
-
-  const trimmed = String(value).trim();
-  const hasSeparator = /[_\s-]/.test(trimmed);
-
-  if (!hasSeparator) {
-    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
-  }
-
-  return trimmed
-    .split(/[_\s-]+/)
-    .filter(Boolean)
-    .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1).toLowerCase())
-    .join("");
-};
-
-const normalizeCertificateTypes = (items = []) =>
-  items.map((item) => ({
-    type: normalizeValueToken(item.type),
-    otherType: item.otherType || undefined,
-  }));
-
-const normalizeAttachments = (items = []) =>
-  items.map((item) => ({
-    type: normalizeValueToken(item.type),
-    phoneNumber: item.phoneNumber || undefined,
-  }));
-
 const formatCertificateRequestResponse = (request) => {
   const client = formatClientResponse(request.client || {}) || {};
   const partner = formatClientResponse(request.partner || {}) || {};
   const user = request.user || {};
+  const legacyPayload = request.legacyPayload || null;
 
   return {
     id: request.id,
     requestNumber: request.requestNumber,
     isComunero: client.clientType === "Comunero",
-    destination: request.destination || "",
-    requestDescription: request.requestDescription || request.description || "",
-    sectorLocation: request.sectorLocation || "",
+    destination: normalizeRequestDestination(request.destination, legacyPayload?.destination),
+    requestDescription: request.requestDescription || request.description || legacyPayload?.requestDescription || legacyPayload?.description || "",
+    sectorLocation: request.sectorLocation || legacyPayload?.sectorLocation || "",
     client: {
       id: client.id || null,
       searchType: "Reniec",
@@ -64,13 +39,14 @@ const formatCertificateRequestResponse = (request) => {
       address: partner.address || "",
       nro_licence: partner.nro_licence || null,
     },
-    certificateTypes: Array.isArray(request.certificateTypes) ? request.certificateTypes : [],
-    exposure: request.exposure || "",
-    attachments: Array.isArray(request.attachments) ? request.attachments : [],
+    certificateTypes: normalizeCertificateTypes(request.certificateTypes || [], legacyPayload),
+    exposure: request.exposure || legacyPayload?.exposure || "",
+    attachments: normalizeAttachments(request.attachments || [], legacyPayload),
     createdBy: {
       dni: user?.dni || "",
       role: user?.role?.name || "",
     },
+    legacyPayload,
     createdAt: request.createdAt,
     updatedAt: request.updatedAt,
   };

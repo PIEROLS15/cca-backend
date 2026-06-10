@@ -1,6 +1,11 @@
 const BEARER_TOKEN = process.env.BEARER_TOKEN;
 const API_URL = `${process.env.API_BASE_URL}/backend-certificado/request-certificate`;
 const PAGE_LIMIT = 200;
+const {
+  normalizeAttachments,
+  normalizeCertificateTypes,
+  normalizeRequestDestination,
+} = require("../../src/api/certificate-requests/utils/certificate-request-legacy.utils");
 
 async function fetchPage(page) {
   const url = `${API_URL}?limit=${PAGE_LIMIT}&page=${page}`;
@@ -19,10 +24,7 @@ async function fetchPage(page) {
 
 async function seedCertificateRequests(prisma) {
   const existingCount = await prisma.certificateRequest.count();
-  if (existingCount > 0 && !process.env.FORCE_SEEDS) {
-    console.log(`  ℹ ${existingCount} solicitudes ya existen, saltando`);
-    return;
-  }
+  const preserveOnly = existingCount > 0 && !process.env.FORCE_SEEDS;
 
   console.log("  ℹ Cargando primera página para determinar total...");
 
@@ -69,6 +71,28 @@ async function seedCertificateRequests(prisma) {
     }
   }
   console.log(`\n  ℹ Total ${allDocs.length} solicitudes descargadas`);
+
+  if (preserveOnly) {
+    let preserved = 0;
+
+    for (const doc of allDocs) {
+      const requestNumber = doc.countRequestCertificate?.trim();
+      if (!requestNumber) {
+        continue;
+      }
+
+      const updatedRows = await prisma.$executeRaw`
+        UPDATE "CertificateRequest"
+        SET "legacyPayload" = ${JSON.stringify(doc)}::jsonb
+        WHERE "requestNumber" = ${requestNumber}
+          AND "legacyPayload" IS NULL
+      `;
+      preserved += Number(updatedRows || 0);
+    }
+
+    console.log(`  ✓ ${preserved} solicitudes preservadas con legacyPayload`);
+    return;
+  }
 
   // Crear placeholders para clientes faltantes
   const missingDocs = new Set();
@@ -130,11 +154,12 @@ async function seedCertificateRequests(prisma) {
           userId,
           partnerId,
           description: doc.description?.trim() || null,
-          destination: doc.destination?.trim() || null,
+          destination: normalizeRequestDestination(doc.destination),
           exposure: doc.exposure?.trim() || null,
           sectorLocation: doc.sectorLocation?.trim() || null,
-          certificateTypes: Array.isArray(doc.type) ? doc.type.map((t) => ({ type: t })) : null,
-          attachments: Array.isArray(doc.attachment) ? doc.attachment.map((a) => ({ type: a })) : null,
+          certificateTypes: normalizeCertificateTypes(Array.isArray(doc.type) ? doc.type : [], doc),
+          attachments: normalizeAttachments(Array.isArray(doc.attachment) ? doc.attachment : [], doc),
+          legacyPayload: doc,
           createdAt: new Date(doc.createdAt),
           updatedAt: new Date(doc.updatedAt),
         },
