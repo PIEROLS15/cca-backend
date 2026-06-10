@@ -51,13 +51,15 @@ const toDisplayDate = (value) => {
 const isSelectedType = (types, key) =>
   types.some((item) => normalizeToken(item.type) === normalizeToken(key));
 
+const isSelectedAttachment = (attachments, keys) => {
+  const expectedKeys = Array.isArray(keys) ? keys : [keys];
+  return attachments.some((item) => expectedKeys.some((key) => normalizeToken(item.type) === normalizeToken(key)));
+};
+
 const findOtherTypeLabel = (types) => {
   const found = types.find((item) => normalizeToken(item.type) === normalizeToken("Otros"));
   return found?.otherType || "";
 };
-
-const findAttachment = (attachments, key) =>
-  attachments.find((item) => normalizeToken(item.type) === normalizeToken(key));
 
 const mark = (selected) => (selected ? "( X )" : "(   )");
 
@@ -95,11 +97,11 @@ const buildCertificateRequestTemplatePdf = async (request) => {
   const otherChecked = isSelectedType(certificateTypes, "Otros");
   const otherLabel = findOtherTypeLabel(certificateTypes);
 
-  const copyCertAttachment = Boolean(findAttachment(attachments, "CopiaCertificadoAnterior"));
-  const copyDniAttachment = Boolean(findAttachment(attachments, "CopiaDni"));
-  const contractAttachment = Boolean(findAttachment(attachments, "ContratoCompraVentaNotariado"));
-  const planoAttachment = Boolean(findAttachment(attachments, "CopiaPlanoMemoria"));
-  const cellAttachment = findAttachment(attachments, "Celular");
+  const copyCertAttachment = isSelectedAttachment(attachments, ["CertAnterior", "CopiaCertificadoAnterior"]);
+  const copyDniAttachment = isSelectedAttachment(attachments, ["CopiaDni", "CopiaDeDni"]);
+  const contractAttachment = isSelectedAttachment(attachments, ["CompraVenta", "ContratoCompraVentaNotariado", "ContratoDeCompraVentaNotariado"]);
+  const planoAttachment = isSelectedAttachment(attachments, ["CopiaPlanoMemoria", "PlanoMemoria", "CopiaDePlanoYMemoria"]);
+  const cellAttachment = attachments.find((item) => normalizeToken(item.type) === normalizeToken("Celular"));
 
   return new Promise((resolve, reject) => {
     doc.on("data", (chunk) => chunks.push(chunk));

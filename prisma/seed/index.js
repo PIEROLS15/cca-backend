@@ -9,6 +9,7 @@ const { seedClients } = require("./clients");
 const { seedCertificateRequests } = require("./certificate-requests");
 const { seedCertificates } = require("./certificates");
 const { seedAssemblyRecordRequests } = require("./assembly-record-requests");
+const { seedCertificateRequestAddresses } = require("./certificate-request-addresses");
 
 const prisma = new PrismaClient();
 
@@ -22,6 +23,7 @@ const SEEDERS = [
   { name: "Solicitudes de certificados", fn: seedCertificateRequests },
   { name: "Certificados", fn: seedCertificates },
   { name: "Solicitudes de acta de asamblea", fn: seedAssemblyRecordRequests },
+  { name: "Sincronizar direcciones de solicitudes", fn: seedCertificateRequestAddresses },
 ];
 
 (async () => {

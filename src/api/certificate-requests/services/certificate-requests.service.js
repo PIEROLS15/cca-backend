@@ -31,12 +31,17 @@ const listCertificateRequests = async ({ page, limit, search }) => {
 
   const where = {};
   if (search) {
-    where.client = {
-      OR: [
-        { fullName: { contains: search, mode: "insensitive" } },
-        { documentNumber: { contains: search, mode: "insensitive" } },
-      ],
-    };
+    where.OR = [
+      { requestNumber: { contains: search, mode: "insensitive" } },
+      {
+        client: {
+          OR: [
+            { fullName: { contains: search, mode: "insensitive" } },
+            { documentNumber: { contains: search, mode: "insensitive" } },
+          ],
+        },
+      },
+    ];
   }
 
   const [docs, total] = await Promise.all([

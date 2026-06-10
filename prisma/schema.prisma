@@ -145,6 +145,7 @@ model CertificateRequest {
   certificateTypes   Json?
   exposure           String?
   attachments        Json?
+  legacyPayload      Json?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
