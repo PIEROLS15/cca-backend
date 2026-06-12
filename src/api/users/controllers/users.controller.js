@@ -45,7 +45,7 @@ const createUser = asyncHandler(async (req, res) => {
   const user = await usersService.createUser({
     ...req.body,
     roleId: Number(req.body.roleId),
-  });
+  }, req.user?.role);
   res.status(201).json(user);
 });
 
@@ -53,7 +53,7 @@ const updateUser = asyncHandler(async (req, res) => {
   const user = await usersService.updateUser(Number(req.params.id), {
     ...req.body,
     roleId: req.body.roleId ? Number(req.body.roleId) : undefined,
-  });
+  }, req.user?.role);
   res.json(user);
 });
 
@@ -64,12 +64,12 @@ const updateUserStatus = asyncHandler(async (req, res) => {
     throw new HttpError(400, "isActive debe ser boolean");
   }
 
-  const user = await usersService.updateUserStatus(Number(req.params.id), isActive);
+  const user = await usersService.updateUserStatus(Number(req.params.id), isActive, req.user?.role);
   res.json(user);
 });
 
 const deleteUser = asyncHandler(async (req, res) => {
-  await usersService.deleteUser(Number(req.params.id));
+  await usersService.deleteUser(Number(req.params.id), req.user?.role);
   res.status(204).send();
 });
 
