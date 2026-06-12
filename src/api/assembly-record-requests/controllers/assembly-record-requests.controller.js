@@ -29,9 +29,9 @@ const createAssemblyRecordRequest = asyncHandler(async (req, res) => {
 
   const request = await assemblyRecordRequestsService.createAssemblyRecordRequest(
     {
+      ...req.body,
       clientId: Number(clientId),
       certificateId: Number(certificateId),
-      description: req.body.description,
     },
     req.user?.sub
   );

@@ -6,6 +6,7 @@ const { mapRemoteCertificateMeasurements } = require("./certificate-measurements
 const { buildRequestLookup, resolveRequestNumberForCertificate } = require("./certificate-request-reconciliation");
 const { collectLegacyOwnerCandidates, buildCertificateOwnerRecords } = require("./certificate-owners");
 const { buildCertificateVerificationSnapshot } = require("../../src/api/certificates/utils/certificate-verification.utils");
+const { normalizeAssemblyRecordAttachments } = require("../../src/api/assembly-record-requests/utils/assembly-record-requests.utils");
 
 const STATUS_MAP = {
   "por firmar": "PorFirmar",
@@ -62,6 +63,12 @@ function normalizeDni(raw) {
     if (stripped.length === 8) return stripped;
   }
   return s;
+}
+
+function parseLegacyDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 async function findOrCreateClient(prisma, dni, fullName, createdAt) {
@@ -329,8 +336,9 @@ async function seedAssemblyRecordRequests(prisma) {
       continue;
     }
 
-    const description = [
-      doc.description?.trim(),
+    const buyerFullName = doc.buyerFullName?.trim() || null;
+    const sellerFullName = doc.sellerFullName?.trim() || null;
+    const description = doc.description?.trim() || [
       doc.typeUser === "comunero" ? null : `(${doc.typeUser})`,
       doc.buyerFullName?.trim() ? `Comprador: ${doc.buyerFullName.trim()}` : null,
       doc.sellerFullName?.trim() ? `Vendedor: ${doc.sellerFullName.trim()}` : null,
@@ -346,6 +354,16 @@ async function seedAssemblyRecordRequests(prisma) {
           certificateId: cert.id,
           userId: null,
           description: description || null,
+          buyerFullName: buyerFullName,
+          sellerFullName: sellerFullName,
+          sectorLocation: doc.sectorLocation?.trim() || null,
+          terrainType: doc.terrainType?.trim() || null,
+          awardDate: parseLegacyDate(doc.awardDate),
+          possessionTime: doc.possessionTime?.trim() || null,
+          email: doc.email?.trim() || null,
+          phone: doc.phone?.trim() || null,
+          attachments: normalizeAssemblyRecordAttachments(Array.isArray(doc.attach) ? doc.attach : [], doc),
+          legacyPayload: doc,
           createdAt: new Date(doc.createdAt),
           updatedAt: new Date(doc.updatedAt),
         },
