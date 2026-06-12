@@ -1,10 +1,11 @@
 const express = require("express");
 const certificateRequestsController = require("../controllers/certificate-requests.controller");
 const { authRequired } = require("../../../middlewares/auth.middleware");
+const { requireModuleAccess } = require("../../../middlewares/module-access.middleware");
 
 const router = express.Router();
 
-router.use(authRequired);
+router.use(authRequired, requireModuleAccess("certificate-requests"));
 
 router.get("/", certificateRequestsController.listCertificateRequests);
 router.get("/download/:filename", certificateRequestsController.downloadCertificateRequestPdf);

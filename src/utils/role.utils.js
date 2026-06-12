@@ -2,8 +2,13 @@ const prisma = require("../config/prisma");
 const HttpError = require("./http-error");
 
 const DEFAULT_ROLES = [
+  { name: "SuperAdmin", description: "Super administrador del sistema" },
   { name: "Admin", description: "Acceso total al sistema" },
+  { name: "Ingeniero", description: "Gestión técnica y certificaciones" },
   { name: "Presidente", description: "Aprobaciones y supervisiones" },
+  { name: "Secretaria", description: "Gestión documentaria" },
+  { name: "Supervisor", description: "Supervisión de procesos" },
+  { name: "Asistente", description: "Soporte operativo" },
   { name: "AtencionCliente", description: "Atencion operativa de solicitudes" },
 ];
 

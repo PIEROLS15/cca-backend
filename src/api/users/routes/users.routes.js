@@ -1,11 +1,11 @@
 const express = require("express");
 const usersController = require("../controllers/users.controller");
 const { authRequired } = require("../../../middlewares/auth.middleware");
-const { requireRoles } = require("../../../middlewares/role.middleware");
+const { requireModuleAccess } = require("../../../middlewares/module-access.middleware");
 
 const router = express.Router();
 
-router.use(authRequired, requireRoles("Admin", "Presidente"));
+router.use(authRequired, requireModuleAccess("users"));
 
 router.get("/", usersController.listUsers);
 router.get("/:id", usersController.getUserById);

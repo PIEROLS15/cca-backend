@@ -3,6 +3,7 @@ const prisma = require("../../../config/prisma");
 const HttpError = require("../../../utils/http-error");
 const { buildPaginationResult, getPaginationParams } = require("../../../utils/pagination");
 const { resolveRoleForUser, withRoleInclude } = require("../../../utils/role.utils");
+const { canManageUserRole } = require("../../../utils/access-control.utils");
 const { sanitizeUser } = require("../utils/users.utils");
 
 const normalizeEmail = (value) => (value ? String(value).trim().toLowerCase() : null);
@@ -94,7 +95,13 @@ const getUserById = async (id) => {
   return sanitizeUser(user);
 };
 
-const createUser = async ({ username, password, fullName, email, dni, roleId }) => {
+const assertActorCanManageUser = (actorRole, targetRole) => {
+  if (!canManageUserRole(actorRole, targetRole)) {
+    throw new HttpError(403, "No tienes permisos para gestionar usuarios de ese grupo");
+  }
+};
+
+const createUser = async ({ username, password, fullName, email, dni, roleId }, actorRole) => {
   const normalizedEmail = normalizeEmail(email);
   const normalizedDni = normalizeDni(dni);
 
@@ -107,6 +114,7 @@ const createUser = async ({ username, password, fullName, email, dni, roleId }) 
 
   const hashedPassword = await bcrypt.hash(password, 10);
   const resolvedRole = await resolveRoleForUser({ roleId });
+  assertActorCanManageUser(actorRole, resolvedRole.name);
 
   const user = await prisma.user.create({
     data: {
@@ -128,11 +136,21 @@ const createUser = async ({ username, password, fullName, email, dni, roleId }) 
   return sanitizeUser(user);
 };
 
-const updateUser = async (id, payload) => {
-  const existingUser = await prisma.user.findUnique({ where: { id } });
+const updateUser = async (id, payload, actorRole) => {
+  const existingUser = await prisma.user.findUnique({
+    where: { id },
+    include: {
+      role: {
+        include: withRoleInclude,
+      },
+    },
+  });
   if (!existingUser) {
     throw new HttpError(404, "Usuario no encontrado");
   }
+
+  const targetRole = payload.roleId ? await resolveRoleForUser({ roleId: payload.roleId }) : existingUser.role;
+  assertActorCanManageUser(actorRole, targetRole.name);
 
   const data = {
     fullName: payload.fullName,
@@ -185,16 +203,37 @@ const updateUser = async (id, payload) => {
   return sanitizeUser(user);
 };
 
-const deleteUser = async (id) => {
-  await getUserById(id);
-  await prisma.user.delete({ where: { id } });
-};
-
-const updateUserStatus = async (id, isActive) => {
-  const existingUser = await prisma.user.findUnique({ where: { id } });
+const deleteUser = async (id, actorRole) => {
+  const existingUser = await prisma.user.findUnique({
+    where: { id },
+    include: {
+      role: {
+        include: withRoleInclude,
+      },
+    },
+  });
   if (!existingUser) {
     throw new HttpError(404, "Usuario no encontrado");
   }
+
+  assertActorCanManageUser(actorRole, existingUser.role.name);
+  await prisma.user.delete({ where: { id } });
+};
+
+const updateUserStatus = async (id, isActive, actorRole) => {
+  const existingUser = await prisma.user.findUnique({
+    where: { id },
+    include: {
+      role: {
+        include: withRoleInclude,
+      },
+    },
+  });
+  if (!existingUser) {
+    throw new HttpError(404, "Usuario no encontrado");
+  }
+
+  assertActorCanManageUser(actorRole, existingUser.role.name);
 
   const user = await prisma.user.update({
     where: { id },
