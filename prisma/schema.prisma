@@ -221,6 +221,16 @@ model AssemblyRecordRequest {
   certificateId Int
   userId        Int?
   description   String?
+  buyerFullName String?
+  sellerFullName String?
+  sectorLocation String?
+  terrainType   String?
+  awardDate     DateTime?
+  possessionTime String?
+  email         String?
+  phone         String?
+  attachments   Json?
+  legacyPayload Json?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 

@@ -3,7 +3,7 @@ const path = require("path");
 const fs = require("fs");
 
 const DATA_FILE = path.join(__dirname, "users-data.json");
-const DEFAULT_PASSWORD = "123456";
+const DEFAULT_PASSWORD = "COMUNA2026";
 
 const ROLE_MAP = {
   admin: "Admin",

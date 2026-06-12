@@ -126,29 +126,25 @@ Esto levanta:
 - **PostgreSQL 16** en el puerto configurado (`POSTGRES_PORT`)
 - **Backend** en el puerto configurado (`BACKEND_PORT`)
 
-En el primer arranque ejecuta automaticamente:
-- `prisma migrate deploy` (migraciones)
-- Todos los seeds (importacion desde APIs externas + archivos locales)
+El arranque ya no ejecuta migraciones ni seeds automaticamente.
 
-### Arranques posteriores
+### Migrar manualmente
 
 ```bash
-docker compose up -d
+docker compose exec backend npm run prisma:migrate:deploy
 ```
 
-El entrypoint detecta que la base de datos ya tiene datos y salta los seeds, arrancando el servidor en segundos.
-
-### Forzar re-ejecucion de seeds
+### Ejecutar seeds manualmente
 
 ```bash
-FORCE_SEEDS=true docker compose up -d --build
+docker compose exec backend npm run prisma:seed
 ```
 
-**No agregues `FORCE_SEEDS` al `.env`**. Usalo solo como variable inline cuando necesites re-importar todos los datos desde las APIs.
+Si quieres forzar reimportaciones masivas, usa `FORCE_SEEDS=true` solo al ejecutar `docker compose exec backend npm run prisma:seed`.
 
 ### Seed data
 
-Los siguientes datos se importan automaticamente en el primer arranque (o con `FORCE_SEEDS=true`):
+Los siguientes datos se importan con `docker compose exec backend npm run prisma:seed` (o con `FORCE_SEEDS=true docker compose exec backend npm run prisma:seed`):
 
 | Seed | Origen | Registros aprox. |
 |---|---|---|
