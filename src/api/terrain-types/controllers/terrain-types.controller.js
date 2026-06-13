@@ -16,6 +16,11 @@ const getTerrainTypeById = asyncHandler(async (req, res) => {
   res.json(terrainType);
 });
 
+const previewDeleteTerrainType = asyncHandler(async (req, res) => {
+  const preview = await terrainTypesService.getTerrainTypeDeletePreview(Number(req.params.id));
+  res.json(preview);
+});
+
 const createTerrainType = asyncHandler(async (req, res) => {
   if (!req.body.name) {
     throw new HttpError(400, "name es obligatorio");
@@ -32,9 +37,16 @@ const updateTerrainType = asyncHandler(async (req, res) => {
   res.json(terrainType);
 });
 
+const deleteTerrainType = asyncHandler(async (req, res) => {
+  await terrainTypesService.deleteTerrainType(Number(req.params.id));
+  res.status(204).send();
+});
+
 module.exports = {
   listTerrainTypes,
   getTerrainTypeById,
+  previewDeleteTerrainType,
   createTerrainType,
   updateTerrainType,
+  deleteTerrainType,
 };

@@ -16,6 +16,11 @@ const getSectorById = asyncHandler(async (req, res) => {
   res.json(sector);
 });
 
+const previewDeleteSector = asyncHandler(async (req, res) => {
+  const preview = await sectorsService.getSectorDeletePreview(Number(req.params.id));
+  res.json(preview);
+});
+
 const createSector = asyncHandler(async (req, res) => {
   if (!req.body.name) {
     throw new HttpError(400, "name es obligatorio");
@@ -32,9 +37,16 @@ const updateSector = asyncHandler(async (req, res) => {
   res.json(sector);
 });
 
+const deleteSector = asyncHandler(async (req, res) => {
+  await sectorsService.deleteSector(Number(req.params.id));
+  res.status(204).send();
+});
+
 module.exports = {
   listSectors,
   getSectorById,
+  previewDeleteSector,
   createSector,
   updateSector,
+  deleteSector,
 };
