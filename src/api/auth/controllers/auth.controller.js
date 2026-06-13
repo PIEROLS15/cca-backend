@@ -2,6 +2,36 @@ const asyncHandler = require("../../../utils/async-handler");
 const HttpError = require("../../../utils/http-error");
 const authService = require("../services/auth.service");
 
+function getAuthCookieOptions({ includeMaxAge = true } = {}) {
+  const options = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+  };
+
+  if (includeMaxAge) {
+    options.maxAge = 8 * 60 * 60 * 1000;
+  }
+
+  const frontendUrl = process.env.FRONTEND_URL;
+
+  if (!frontendUrl) return options;
+
+  try {
+    const hostname = new URL(frontendUrl).hostname;
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return options;
+    }
+
+    options.domain = hostname.startsWith("www.") ? hostname.slice(4) : hostname;
+  } catch {
+    // Si FRONTEND_URL no es una URL válida, usamos la cookie sin domain.
+  }
+
+  return options;
+}
+
 const login = asyncHandler(async (req, res) => {
   const { username, password } = req.body;
 
@@ -11,12 +41,7 @@ const login = asyncHandler(async (req, res) => {
 
   const result = await authService.login({ username, password });
 
-  res.cookie("token", result.token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 8 * 60 * 60 * 1000,
-  });
+  res.cookie("token", result.token, getAuthCookieOptions());
 
   res.json({ user: result.user });
 });
@@ -27,11 +52,7 @@ const me = asyncHandler(async (req, res) => {
 });
 
 const logout = asyncHandler(async (req, res) => {
-  res.clearCookie("token", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-  });
+  res.clearCookie("token", getAuthCookieOptions({ includeMaxAge: false }));
   res.json({ message: "Sesión cerrada correctamente" });
 });
 
