@@ -1,3 +1,5 @@
+const { getRoleGroup } = require("../../../utils/access-control.utils");
+
 const sanitizeUser = (user) => ({
   id: user.id,
   username: user.username,
@@ -10,6 +12,7 @@ const sanitizeUser = (user) => ({
         id: user.role.id,
         name: user.role.name,
         description: user.role.description,
+        group: getRoleGroup(user.role.name),
         permissions: user.role.rolePermissions?.map((item) => item.permission.key) || [],
       }
     : null,

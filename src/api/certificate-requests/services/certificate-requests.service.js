@@ -1,53 +1,54 @@
 const prisma = require("../../../config/prisma");
 const HttpError = require("../../../utils/http-error");
 const { buildPaginationResult, getPaginationParams } = require("../../../utils/pagination");
+const { makeDeletionPreview, makeImpactItem } = require("../../../utils/deletion-preview");
 const {
-  buildRequestCode,
   buildRequestNumber,
-  normalizeValueToken,
   normalizeCertificateTypes,
   normalizeAttachments,
   formatCertificateRequestResponse,
 } = require("../utils/certificate-requests.utils");
+const clientsService = require("../../clients/services/clients.service");
 
-const normalizeRoleName = (value) =>
-  String(value || "")
-    .toLowerCase()
-    .replace(/[_\s-]/g, "");
+const requestIncludes = {
+  client: { include: { commoner: true } },
+  user: { include: { role: true } },
+  partner: { include: { commoner: true } },
+};
 
-const nextRequestCode = async () => {
+const nextRequestNumber = async () => {
   const lastRequest = await prisma.certificateRequest.findFirst({
     orderBy: { id: "desc" },
     select: { id: true },
   });
 
   const nextSequence = (lastRequest?.id || 0) + 1;
-  return {
-    code: buildRequestCode(nextSequence),
-    requestNumber: buildRequestNumber(nextSequence),
-  };
+  return buildRequestNumber(nextSequence);
 };
 
-const listCertificateRequests = async ({ status, page, limit }) => {
+const listCertificateRequests = async ({ page, limit, search }) => {
   const pagination = getPaginationParams({ page, limit });
 
-  const where = {
-    status: status || undefined,
-  };
+  const where = {};
+  if (search) {
+    where.OR = [
+      { requestNumber: { contains: search, mode: "insensitive" } },
+      {
+        client: {
+          OR: [
+            { fullName: { contains: search, mode: "insensitive" } },
+            { documentNumber: { contains: search, mode: "insensitive" } },
+          ],
+        },
+      },
+    ];
+  }
 
   const [docs, total] = await Promise.all([
     prisma.certificateRequest.findMany({
       where,
-      include: {
-        client: true,
-        user: {
-          include: {
-            role: true,
-          },
-        },
-        certificate: true,
-      },
-      orderBy: { id: "desc" },
+      include: requestIncludes,
+      orderBy: { createdAt: "desc" },
       skip: pagination.skip,
       take: pagination.limit,
     }),
@@ -62,17 +63,43 @@ const listCertificateRequests = async ({ status, page, limit }) => {
   });
 };
 
-const getCertificateRequestById = async (id) => {
+const getCertificateRequestById = async (identifier) => {
+  const id = Number(identifier);
+  const isNumeric = !Number.isNaN(id) && String(id) === identifier.trim();
+
+  let request = null;
+
+  if (isNumeric) {
+    request = await prisma.certificateRequest.findUnique({
+      where: { id },
+      include: requestIncludes,
+    });
+  }
+
+  if (!request) {
+    request = await prisma.certificateRequest.findFirst({
+      where: { requestNumber: { startsWith: identifier } },
+      include: requestIncludes,
+    });
+  }
+
+  if (!request) {
+    throw new HttpError(404, "Solicitud de certificado no encontrada");
+  }
+
+  return formatCertificateRequestResponse(request);
+};
+
+const getCertificateRequestDeletePreview = async (id) => {
   const request = await prisma.certificateRequest.findUnique({
     where: { id },
-    include: {
-      client: true,
-      user: {
-        include: {
-          role: true,
+    select: {
+      requestNumber: true,
+      _count: {
+        select: {
+          certificates: true,
         },
       },
-      certificate: true,
     },
   });
 
@@ -80,7 +107,13 @@ const getCertificateRequestById = async (id) => {
     throw new HttpError(404, "Solicitud de certificado no encontrada");
   }
 
-  return formatCertificateRequestResponse(request);
+  return makeDeletionPreview({
+    entityLabel: "solicitud de certificado",
+    itemName: request.requestNumber,
+    willSetNull: request._count.certificates > 0
+      ? [makeImpactItem({ label: "Certificados vinculados", count: request._count.certificates })]
+      : [],
+  });
 };
 
 const createCertificateRequest = async (payload, userId) => {
@@ -103,61 +136,49 @@ const createCertificateRequest = async (payload, userId) => {
     throw new HttpError(401, "El usuario autenticado no existe o ya no esta disponible");
   }
 
-  const sequenceData = await nextRequestCode();
+  const requestNumber = await nextRequestNumber();
   const isComunero = typeof payload.isComunero === "boolean" ? payload.isComunero : true;
-  const clientType = isComunero ? "Comunero" : "Tercero";
 
-  const client = await prisma.client.upsert({
-    where: { documentNumber },
-    update: {
-      fullName,
-      address: clientSnapshot.address || undefined,
-      clientType,
-    },
-    create: {
-      fullName,
-      documentNumber,
-      address: clientSnapshot.address || null,
-      phone: null,
-      clientType,
-    },
+  const client = await clientsService.upsertClientByDocument(documentNumber, {
+    fullName,
+    address: clientSnapshot.address || null,
+    phone: null,
+    isComunero,
   });
 
+  let partnerId = null;
   const partnerClient = payload.partnerClient || {};
+
+  if (partnerClient.fullName || partnerClient.documentNumber) {
+    const partnerDoc = String(partnerClient.documentNumber || "").trim();
+    const partnerName = String(partnerClient.fullName || "").trim();
+
+    if (partnerDoc && partnerName) {
+      const partner = await clientsService.upsertClientByDocument(partnerDoc, {
+        fullName: partnerName,
+        address: partnerClient.address || null,
+        phone: null,
+        isComunero: false,
+      });
+      partnerId = partner.id;
+    }
+  }
 
   const request = await prisma.certificateRequest.create({
     data: {
-      code: sequenceData.code,
-      requestNumber: sequenceData.requestNumber,
+      requestNumber,
       clientId: client.id,
       userId: creator?.id || null,
+      partnerId,
       description: payload.requestDescription || null,
-      isComunero,
       destination: payload.destination || null,
       requestDescription: payload.requestDescription || null,
       sectorLocation: payload.sectorLocation || null,
-      clientSearchType: normalizeValueToken(clientSnapshot.searchType || "Reniec") || "Reniec",
-      clientFullName: clientSnapshot.fullName || client.fullName,
-      clientDocumentNumber: clientSnapshot.documentNumber || client.documentNumber,
-      clientAddress: clientSnapshot.address || client.address || "",
-      partnerSearchType: normalizeValueToken(partnerClient.searchType || "") || null,
-      partnerFullName: partnerClient.fullName || null,
-      partnerDocumentNumber: partnerClient.documentNumber || null,
-      partnerAddress: partnerClient.address || null,
       certificateTypes: normalizeCertificateTypes(payload.certificateTypes || []),
       exposure: payload.exposure || null,
       attachments: normalizeAttachments(payload.attachments || []),
-      createdByDni: creator?.dni || null,
-      createdByRole: creator?.role?.name ? normalizeValueToken(creator.role.name) : null,
     },
-    include: {
-      client: true,
-      user: {
-        include: {
-          role: true,
-        },
-      },
-    },
+    include: requestIncludes,
   });
 
   return formatCertificateRequestResponse(request);
@@ -166,80 +187,72 @@ const createCertificateRequest = async (payload, userId) => {
 const updateCertificateRequest = async (id, payload) => {
   const current = await prisma.certificateRequest.findUnique({
     where: { id },
-    include: {
-      client: true,
-      user: {
-        include: { role: true },
-      },
-    },
+    include: requestIncludes,
   });
 
   if (!current) {
     throw new HttpError(404, "Solicitud de certificado no encontrada");
   }
 
-  const clientSnapshot = payload.client || {};
+  const data = {};
+
+  if (payload.client !== undefined) {
+    const clientSnapshot = payload.client;
+    const doc = String(clientSnapshot.documentNumber || "").trim();
+    const name = String(clientSnapshot.fullName || "").trim();
+
+    if (doc && name) {
+      const isComunero = typeof payload.isComunero === "boolean" ? payload.isComunero : current.client?.commoner != null;
+
+      const updatedClient = await clientsService.upsertClientByDocument(doc, {
+        fullName: name,
+        address: clientSnapshot.address || null,
+        phone: null,
+        isComunero,
+      });
+      data.clientId = updatedClient.id;
+    }
+  }
+
   const partnerClient = payload.partnerClient || {};
+
+  if (Object.keys(payload.partnerClient || {}).length > 0) {
+    const partnerDoc = String(partnerClient.documentNumber || "").trim();
+    const partnerName = String(partnerClient.fullName || "").trim();
+
+    if (partnerDoc && partnerName) {
+      const partner = await clientsService.upsertClientByDocument(partnerDoc, {
+        fullName: partnerName,
+        address: partnerClient.address || null,
+        phone: null,
+        isComunero: false,
+      });
+      data.partnerId = partner.id;
+    } else {
+      data.partnerId = null;
+    }
+  }
+
+  if (payload.description !== undefined) data.description = payload.description;
+  if (payload.requestDescription !== undefined) data.requestDescription = payload.requestDescription;
+  if (payload.destination !== undefined) data.destination = payload.destination;
+  if (payload.sectorLocation !== undefined) data.sectorLocation = payload.sectorLocation;
+  if (payload.exposure !== undefined) data.exposure = payload.exposure;
+  if (payload.certificateTypes !== undefined) data.certificateTypes = normalizeCertificateTypes(payload.certificateTypes);
+  if (payload.attachments !== undefined) data.attachments = normalizeAttachments(payload.attachments);
 
   const updated = await prisma.certificateRequest.update({
     where: { id },
-    data: {
-      description: payload.requestDescription || payload.description,
-      isComunero: typeof payload.isComunero === "boolean" ? payload.isComunero : undefined,
-      destination: payload.destination,
-      requestDescription: payload.requestDescription,
-      sectorLocation: payload.sectorLocation,
-      clientSearchType: clientSnapshot.searchType ? normalizeValueToken(clientSnapshot.searchType) : undefined,
-      clientFullName: clientSnapshot.fullName,
-      clientDocumentNumber: clientSnapshot.documentNumber,
-      clientAddress: clientSnapshot.address,
-      partnerSearchType: partnerClient.searchType ? normalizeValueToken(partnerClient.searchType) : undefined,
-      partnerFullName: partnerClient.fullName,
-      partnerDocumentNumber: partnerClient.documentNumber,
-      partnerAddress: partnerClient.address,
-      certificateTypes: payload.certificateTypes ? normalizeCertificateTypes(payload.certificateTypes) : undefined,
-      exposure: payload.exposure,
-      attachments: payload.attachments ? normalizeAttachments(payload.attachments) : undefined,
-      status: payload.status,
-    },
-    include: {
-      client: true,
-      user: {
-        include: {
-          role: true,
-        },
-      },
-      certificate: true,
-    },
+    data,
+    include: requestIncludes,
   });
 
   return formatCertificateRequestResponse(updated);
 };
 
 const deleteCertificateRequest = async (id) => {
-  const request = await prisma.certificateRequest.findUnique({ where: { id } });
-  if (!request) {
-    throw new HttpError(404, "Solicitud de certificado no encontrada");
-  }
+  await getCertificateRequestDeletePreview(id);
   await prisma.certificateRequest.delete({ where: { id } });
-};
-
-const getRoleView = async (role, query) => {
-  const requests = await listCertificateRequests(query);
-
-  if (normalizeRoleName(role) === normalizeRoleName("Presidente")) {
-    return {
-      role,
-      canApprove: true,
-      ...requests,
-    };
-  }
-
-  return {
-    role,
-    canApprove: false,
-    ...requests,
-  };
 };
 
 module.exports = {
@@ -248,5 +261,5 @@ module.exports = {
   createCertificateRequest,
   updateCertificateRequest,
   deleteCertificateRequest,
-  getRoleView,
+  getCertificateRequestDeletePreview,
 };

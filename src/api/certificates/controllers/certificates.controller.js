@@ -18,27 +18,16 @@ const getCertificateById = asyncHandler(async (req, res) => {
 });
 
 const createCertificate = asyncHandler(async (req, res) => {
-  if (!req.body.clientId) {
-    throw new HttpError(400, "clientId es obligatorio");
+  if (!req.body.owners || !Array.isArray(req.body.owners) || req.body.owners.length === 0) {
+    throw new HttpError(400, "owners es obligatorio y debe contener al menos un propietario");
   }
 
-  const certificate = await certificatesService.createCertificate({
-    ...req.body,
-    clientId: Number(req.body.clientId),
-    requestId: req.body.requestId ? Number(req.body.requestId) : undefined,
-    sectorId: req.body.sectorId ? Number(req.body.sectorId) : undefined,
-    terrainTypeId: req.body.terrainTypeId ? Number(req.body.terrainTypeId) : undefined,
-  });
-
+  const certificate = await certificatesService.createCertificate(req.body, req.user?.sub);
   res.status(201).json(certificate);
 });
 
 const updateCertificate = asyncHandler(async (req, res) => {
-  const certificate = await certificatesService.updateCertificate(Number(req.params.id), {
-    ...req.body,
-    sectorId: req.body.sectorId ? Number(req.body.sectorId) : null,
-    terrainTypeId: req.body.terrainTypeId ? Number(req.body.terrainTypeId) : null,
-  });
+  const certificate = await certificatesService.updateCertificate(Number(req.params.id), req.body);
   res.json(certificate);
 });
 
@@ -47,19 +36,9 @@ const deleteCertificate = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
-const previewCertificate = asyncHandler(async (req, res) => {
-  const certificate = await certificatesService.getCertificateById(Number(req.params.id));
-  res.json({
-    code: certificate.code,
-    correlative: certificate.correlative,
-    status: certificate.status,
-    client: certificate.client.fullName,
-    documentNumber: certificate.client.documentNumber,
-    location: certificate.location,
-    mz: certificate.mz,
-    lot: certificate.lot,
-    barcodeValue: certificate.code,
-  });
+const previewDeleteCertificate = asyncHandler(async (req, res) => {
+  const preview = await certificatesService.getCertificateDeletePreview(Number(req.params.id));
+  res.json(preview);
 });
 
 const downloadCertificatePdf = asyncHandler(async (req, res) => {
@@ -67,8 +46,24 @@ const downloadCertificatePdf = asyncHandler(async (req, res) => {
   const pdfBuffer = await buildCertificatePdf(certificate);
 
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="certificado-${certificate.code}.pdf"`);
+  res.setHeader("Content-Disposition", `inline; filename="certificado-${certificate.certificateNumber}.pdf"`);
   res.send(pdfBuffer);
+});
+
+const downloadCertificatePdfByFilename = asyncHandler(async (req, res) => {
+  const filename = req.params.filename || "";
+  const certificateNumber = filename.replace(/^certificado-/, "").replace(/\.pdf$/, "");
+  const certificate = await certificatesService.getCertificateByNumber(certificateNumber);
+  const pdfBuffer = await buildCertificatePdf(certificate);
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+  res.send(pdfBuffer);
+});
+
+const lookupCertificateByNumber = asyncHandler(async (req, res) => {
+  const certificate = await certificatesService.getCertificateByNumber(req.params.number);
+  res.json(certificate);
 });
 
 module.exports = {
@@ -77,6 +72,8 @@ module.exports = {
   createCertificate,
   updateCertificate,
   deleteCertificate,
-  previewCertificate,
+  previewDeleteCertificate,
   downloadCertificatePdf,
+  downloadCertificatePdfByFilename,
+  lookupCertificateByNumber,
 };

@@ -1,0 +1,56 @@
+name: Backend Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: backend-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build release and deploy to VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Package release
+        run: |
+          tar -czf "$RUNNER_TEMP/backend-release.tgz" \
+            --exclude=.git \
+            --exclude=node_modules \
+            --exclude=.env \
+            --exclude=.next \
+            --exclude=.github \
+            --exclude=coverage \
+            .
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Trust VPS host
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${{ secrets.VPS_PORT }}" -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Prepare remote directories
+        run: |
+          ssh -p "${{ secrets.VPS_PORT }}" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "mkdir -p '${{ secrets.VPS_BACKEND_DIR }}/releases/${{ github.sha }}' '${{ secrets.VPS_BACKEND_DIR }}/shared' '/opt/app/backups/db'"
+
+      - name: Upload release archive
+        run: |
+          scp -P "${{ secrets.VPS_PORT }}" "$RUNNER_TEMP/backend-release.tgz" \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ secrets.VPS_BACKEND_DIR }}/releases/${{ github.sha }}.tgz"
+
+      - name: Extract and deploy
+        run: |
+          ssh -p "${{ secrets.VPS_PORT }}" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "set -e; RELEASE_DIR='${{ secrets.VPS_BACKEND_DIR }}/releases/${{ github.sha }}'; ARCHIVE='${{ secrets.VPS_BACKEND_DIR }}/releases/${{ github.sha }}.tgz'; tar -xzf \"\$ARCHIVE\" -C \"\$RELEASE_DIR\"; rm -f \"\$ARCHIVE\"; cd \"\$RELEASE_DIR\"; sh deploy/backend/deploy.sh"

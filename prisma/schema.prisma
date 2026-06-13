@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,21 +7,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum ClientType {
-  Comunero
-  Tercero
-}
-
 enum CertificateStatus {
   PorFirmar
   PorRecoger
   Entregado
 }
 
-enum RequestStatus {
-  Pendiente
-  Aprobada
-  Rechazada
+enum TerrainMeasurementMode {
+  RECTANGULAR_AUTO
+  AREA_PERIMETER
+  MANUAL_TOTAL_AREA
 }
 
 model User {
@@ -43,6 +33,7 @@ model User {
 
   role Role @relation(fields: [roleId], references: [id])
 
+  certificates          Certificate[]
   certificateRequests   CertificateRequest[]
   assemblyRecordRequest AssemblyRecordRequest[]
 }
@@ -88,85 +79,139 @@ model Sector {
   certificates Certificate[]
 }
 
-model TerrainType {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model TerrainTypeConfig {
+  id                       Int                    @id @default(autoincrement())
+  key                      String                 @unique
+  label                    String
+  formMode                 TerrainMeasurementMode
+  showMzLot                Boolean                @default(true)
+  allowAdditionalMeasure   Boolean                @default(false)
+  allowAreaPerimeterToggle Boolean                @default(false)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
 
+  terrainTypes TerrainType[]
+}
+
+model TerrainType {
+  id                  Int      @id @default(autoincrement())
+  name                String   @unique
+  terrainTypeConfigId Int?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  config       TerrainTypeConfig? @relation(fields: [terrainTypeConfigId], references: [id])
   certificates Certificate[]
 }
 
 model Client {
-  id             Int          @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   fullName       String
-  documentNumber String       @unique
+  documentNumber String   @unique
   address        String?
   phone          String?
-  clientType     ClientType
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  certificates           Certificate[]
-  certificateRequests    CertificateRequest[]
+  commoner     Commoner?
+  certificates          Certificate[]       @relation("CertificateClient")
+  partnerCertificates   Certificate[]       @relation("CertificatePartner")
+  certificateRequests   CertificateRequest[]
+  partnerRequests       CertificateRequest[] @relation("CertificateRequestPartner")
   assemblyRecordRequests AssemblyRecordRequest[]
+  certificateOwners     CertificateOwner[]
+}
+
+model Commoner {
+  id              Int      @id @default(autoincrement())
+  clientId        Int      @unique
+  licenseSequence Int?     @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 
 model CertificateRequest {
-  id                    Int           @id @default(autoincrement())
-  code                  String        @unique
-  requestNumber         String        @unique
-  clientId              Int
-  userId                Int?
-  description           String?
-  isComunero            Boolean       @default(true)
-  destination           String?
-  requestDescription    String?
-  sectorLocation        String?
-  clientSearchType      String?
-  clientFullName        String?
-  clientDocumentNumber  String?
-  clientAddress         String?
-  partnerSearchType     String?
-  partnerFullName       String?
-  partnerDocumentNumber String?
-  partnerAddress        String?
-  certificateTypes      Json?
-  exposure              String?
-  attachments           Json?
-  createdByDni          String?
-  createdByRole         String?
-  status                RequestStatus @default(Pendiente)
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
+  id                 Int           @id @default(autoincrement())
+  requestNumber      String        @unique
+  clientId           Int
+  userId             Int?
+  partnerId          Int?
+  description        String?
+  destination        String?
+  requestDescription String?
+  sectorLocation     String?
+  certificateTypes   Json?
+  exposure           String?
+  attachments        Json?
+  legacyPayload      Json?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
-  client      Client       @relation(fields: [clientId], references: [id])
-  user        User?        @relation(fields: [userId], references: [id])
-  certificate Certificate?
+  client  Client  @relation(fields: [clientId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
+  partner Client? @relation("CertificateRequestPartner", fields: [partnerId], references: [id])
+
+  certificates Certificate[]
 }
 
 model Certificate {
-  id            Int               @id @default(autoincrement())
-  code          String            @unique
-  correlative   Int               @unique
-  clientId      Int
-  requestId     Int?              @unique
-  sectorId      Int?
-  terrainTypeId Int?
-  location      String?
-  mz            String?
-  lot           String?
-  status        CertificateStatus @default(PorFirmar)
-  issuedAt      DateTime?
-  deliveredAt   DateTime?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  id                Int               @id @default(autoincrement())
+  certificateNumber String            @unique
+  verificationToken String            @unique @default(cuid())
+  requestNumber     String
+  certificateRequestId Int?
+  clientId          Int
+  partnerId         Int?
+  sectorId          Int
+  terrainTypeId     Int
+  userId            Int
+  width             Decimal?          @db.Decimal(10, 2)
+  length            Decimal?          @db.Decimal(10, 2)
+  totalArea         Decimal?          @db.Decimal(10, 2)
+  area              Decimal?          @db.Decimal(10, 2)
+  perimeter         Decimal?          @db.Decimal(10, 2)
+  additionalWidth   Decimal?          @db.Decimal(10, 2)
+  additionalLength  Decimal?          @db.Decimal(10, 2)
+  measurementModeUsed TerrainMeasurementMode @default(RECTANGULAR_AUTO)
+  legacyPayload     Json?
+  issuedSnapshot    Json?
+  mz                String?
+  lot               String?
+  north             String?
+  south             String?
+  east              String?
+  west              String?
+  status            CertificateStatus @default(PorFirmar)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
-  client                 Client                  @relation(fields: [clientId], references: [id])
-  request                CertificateRequest?     @relation(fields: [requestId], references: [id])
-  sector                 Sector?                 @relation(fields: [sectorId], references: [id])
-  terrainType            TerrainType?            @relation(fields: [terrainTypeId], references: [id])
+  client              Client              @relation("CertificateClient", fields: [clientId], references: [id])
+  partner             Client?             @relation("CertificatePartner", fields: [partnerId], references: [id])
+  sector              Sector              @relation(fields: [sectorId], references: [id])
+  terrainType         TerrainType         @relation(fields: [terrainTypeId], references: [id])
+  user                User                @relation(fields: [userId], references: [id])
+  certificateRequest  CertificateRequest? @relation(fields: [certificateRequestId], references: [id])
+  owners              CertificateOwner[]
   assemblyRecordRequests AssemblyRecordRequest[]
+}
+
+model CertificateOwner {
+  id            Int      @id @default(autoincrement())
+  certificateId Int
+  clientId      Int
+  order         Int
+  source        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  certificate Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+  client      Client      @relation(fields: [clientId], references: [id])
+
+  @@unique([certificateId, order])
+  @@unique([certificateId, clientId])
+  @@index([clientId])
 }
 
 model AssemblyRecordRequest {
@@ -176,7 +221,16 @@ model AssemblyRecordRequest {
   certificateId Int
   userId        Int?
   description   String?
-  status        RequestStatus @default(Pendiente)
+  buyerFullName String?
+  sellerFullName String?
+  sectorLocation String?
+  terrainType   String?
+  awardDate     DateTime?
+  possessionTime String?
+  email         String?
+  phone         String?
+  attachments   Json?
+  legacyPayload Json?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 

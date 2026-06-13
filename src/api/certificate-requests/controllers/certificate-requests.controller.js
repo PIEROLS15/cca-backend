@@ -6,9 +6,9 @@ const { buildCertificateRequestPdf } = require("../utils/certificate-requests-pd
 
 const listCertificateRequests = asyncHandler(async (req, res) => {
   const data = await certificateRequestsService.listCertificateRequests({
-    status: req.query.status,
     page: req.query.page,
     limit: req.query.limit,
+    search: req.query.search,
   });
   return sendSuccess(res, {
     message: "Solicitudes de certificado encontradas correctamente",
@@ -17,7 +17,7 @@ const listCertificateRequests = asyncHandler(async (req, res) => {
 });
 
 const getCertificateRequestById = asyncHandler(async (req, res) => {
-  const request = await certificateRequestsService.getCertificateRequestById(Number(req.params.id));
+  const request = await certificateRequestsService.getCertificateRequestById(req.params.id);
   res.json(request);
 });
 
@@ -46,38 +46,21 @@ const deleteCertificateRequest = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
-const getRoleView = asyncHandler(async (req, res) => {
-  const data = await certificateRequestsService.getRoleView(req.user.role, {
-    status: req.query.status,
-    page: req.query.page,
-    limit: req.query.limit,
-  });
-  return sendSuccess(res, {
-    message: "Vista por rol obtenida correctamente",
-    data,
-  });
-});
-
-const previewCertificateRequest = asyncHandler(async (req, res) => {
-  const request = await certificateRequestsService.getCertificateRequestById(Number(req.params.id));
-  res.json({
-    requestNumber: request.requestNumber,
-    client: request.client.fullName,
-    document: request.client.documentNumber,
-    status: request.status,
-    createdAt: request.createdAt,
-    preview: `Solicitud ${request.requestNumber} para ${request.client.fullName}`,
-  });
+const previewDeleteCertificateRequest = asyncHandler(async (req, res) => {
+  const preview = await certificateRequestsService.getCertificateRequestDeletePreview(Number(req.params.id));
+  res.json(preview);
 });
 
 const downloadCertificateRequestPdf = asyncHandler(async (req, res) => {
-  const request = await certificateRequestsService.getCertificateRequestById(Number(req.params.id));
+  const filename = req.params.filename || "";
+  const requestNumber = filename.replace(/^solicitud-certificado-/, "").replace(/\.pdf$/, "");
+  const request = await certificateRequestsService.getCertificateRequestById(requestNumber);
   const pdfBuffer = await buildCertificateRequestPdf(request);
 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
     "Content-Disposition",
-    `attachment; filename="solicitud-certificado-${request.requestNumber}.pdf"`
+    `inline; filename="${filename}"`
   );
   res.send(pdfBuffer);
 });
@@ -88,7 +71,6 @@ module.exports = {
   createCertificateRequest,
   updateCertificateRequest,
   deleteCertificateRequest,
-  getRoleView,
-  previewCertificateRequest,
+  previewDeleteCertificateRequest,
   downloadCertificateRequestPdf,
 };

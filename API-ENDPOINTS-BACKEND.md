@@ -10,11 +10,13 @@ Este documento lista los endpoints del backend para probarlos uno por uno.
 
 ## Autenticacion
 
-Todos los endpoints (excepto `/health` y `/api/auth/*`) requieren header:
+Todos los endpoints (excepto `/health` y `/api/auth/login`) requieren autenticacion.
+El token JWT se genera via `POST /api/auth/login` y se almacena automaticamente en una cookie httpOnly (`token`).
+El endpoint de login no devuelve el token en el JSON de respuesta.
+
+Alternativamente, se puede usar el header:
 
 - `Authorization: Bearer <token>`
-
-Obtienes el token desde `POST /api/auth/login`.
 
 ## Formato de respuesta paginada
 
@@ -45,7 +47,7 @@ Respuesta:
 }
 ```
 
-## 1) Auth
+## 1) Auth (no requiere rol especifico)
 
 ### POST `/api/auth/login`
 
@@ -58,15 +60,151 @@ Body:
 }
 ```
 
-## 2) Roles
+Respuesta: setea una cookie httpOnly `token` con el JWT. Devuelve solo los datos del usuario:
+
+```json
+{
+  "user": {
+    "id": 1,
+    "username": "admin",
+    "fullName": "Admin",
+    "email": "admin@correo.com",
+    "dni": "00000258",
+    "isActive": true,
+    "role": {
+      "id": 1,
+      "name": "Admin",
+      "description": "Acceso total al sistema",
+      "permissions": []
+    },
+    "createdAt": "2026-05-18T23:55:52.452Z",
+    "updatedAt": "2026-05-18T23:55:52.452Z"
+  }
+}
+```
+
+### POST `/api/auth/logout`
+
+Requiere autenticacion (token en cookie o Authorization header). Limpia la cookie `token`.
+
+```json
+{
+  "message": "Sesión cerrada correctamente"
+}
+```
+
+### GET `/api/auth/me`
+
+Requiere autenticacion. Valida el token JWT y devuelve los datos del usuario autenticado. Util para verificar si la sesion sigue activa desde el frontend.
+
+```json
+{
+  "user": {
+    "id": 1,
+    "username": "admin",
+    "fullName": "Admin",
+    "email": "admin@correo.com",
+    "dni": "00000258",
+    "isActive": true,
+    "role": {
+      "id": 1,
+      "name": "Admin",
+      "description": "Acceso total al sistema",
+      "permissions": []
+    },
+    "createdAt": "2026-05-18T23:55:52.452Z",
+    "updatedAt": "2026-05-18T23:55:52.452Z"
+  }
+}
+```
+
+### PATCH `/api/auth/profile`
+
+Requiere autenticacion. Actualiza los datos personales del usuario autenticado.
+
+Body:
+
+```json
+{
+  "fullName": "Piero Llanos Sanchez",
+  "username": "pierols",
+  "email": "piero@correo.com"
+}
+```
+
+Respuesta:
+
+```json
+{
+  "user": {
+    "id": 1,
+    "username": "pierols",
+    "fullName": "Piero Llanos Sanchez",
+    "email": "piero@correo.com",
+    "dni": "73171545",
+    "isActive": true,
+    "role": {
+      "id": 1,
+      "name": "Admin",
+      "description": "Acceso total al sistema",
+      "permissions": []
+    },
+    "createdAt": "2026-05-18T23:55:52.452Z",
+    "updatedAt": "2026-05-18T23:55:52.452Z"
+  }
+}
+```
+
+### POST `/api/auth/change-password`
+
+Requiere autenticacion. Cambia la contraseña del usuario autenticado. Requiere verificar la contraseña actual.
+
+Body:
+
+```json
+{
+  "currentPassword": "123456",
+  "newPassword": "nueva-clave-segura"
+}
+```
+
+Respuesta:
+
+```json
+{
+  "message": "Contraseña actualizada correctamente"
+}
+```
+
+### POST `/api/auth/verify-password`
+
+Requiere autenticacion. Verifica que la contraseña actual sea correcta (util para el flujo de cambio de contraseña en dos pasos desde el frontend).
+
+Body:
+
+```json
+{
+  "password": "123456"
+}
+```
+
+Respuesta:
+
+```json
+{
+  "message": "Contraseña verificada correctamente"
+}
+```
+
+## 2) Roles (requiere rol `Admin`)
 
 ### GET `/api/roles?page=1&limit=10`
+
+Query params: `page`, `limit`, cualquier otro se pasa al servicio.
 
 ### GET `/api/roles/:id`
 
 ### POST `/api/roles`
-
-Body:
 
 ```json
 {
@@ -100,14 +238,17 @@ Body:
 
 ### DELETE `/api/roles/:id`
 
-## 3) Users
+Respuesta: `{ "message": "...", "error": false, "status": 200, "data": null }`
+
+## 3) Users (requiere rol `Admin` o `Presidente`)
 
 ### GET `/api/users?page=1&limit=10`
 
 Filtros opcionales:
 
-- `roleId=2`
-- `isActive=true|false`
+- `roleId` (numero)
+- `isActive` (`true` o `false`)
+- cualquier otro se pasa al servicio
 
 ### GET `/api/users/:id`
 
@@ -176,6 +317,8 @@ Shape esperado del usuario en respuestas:
 
 ### DELETE `/api/users/:id`
 
+Respuesta: `204 No Content`
+
 ## 4) Sectors
 
 ### GET `/api/sectors?page=1&limit=10`
@@ -199,6 +342,8 @@ Shape esperado del usuario en respuestas:
 ```
 
 ### DELETE `/api/sectors/:id`
+
+Respuesta: `204 No Content`
 
 ## 5) Terrain Types
 
@@ -224,6 +369,8 @@ Shape esperado del usuario en respuestas:
 
 ### DELETE `/api/terrain-types/:id`
 
+Respuesta: `204 No Content`
+
 ## 6) Clients
 
 ### GET `/api/clients?page=1&limit=10`
@@ -233,9 +380,43 @@ Query opcional adicional:
 - `clientType=Comunero`
 - `clientType=Tercero`
 
+Observaciones:
+
+- `nro_licence` se devuelve solo cuando el cliente es `Comunero`
+- el correlativo de `nro_licence` se asigna automaticamente en backend
+- no se envía `nro_licence` en `POST` ni en `PUT`
+
+### GET `/api/clients/search/:document`
+
+Busca un cliente por numero de documento en la base de datos local.
+Requiere al menos 3 caracteres.
+
+### GET `/api/clients/reniec/:document`
+
+Consulta el DNI en la API externa de RENIEC. Requiere exactamente 8 digitos.
+
 ### GET `/api/clients/:id`
 
+Ejemplo de respuesta:
+
+```json
+{
+  "id": 1,
+  "fullName": "Arias Aburto, Olga Lidia",
+  "documentNumber": "80093634",
+  "address": "Asia",
+  "phone": null,
+  "clientType": "Comunero",
+  "nro_licence": "0001",
+  "createdAt": "2026-05-25T23:46:15.722Z",
+  "updatedAt": "2026-05-25T23:46:15.722Z"
+}
+```
+
 ### POST `/api/clients`
+
+Si `clientType` es `Comunero`, el backend asigna automaticamente el siguiente `nro_licence`.
+Si `clientType` es `Tercero`, `nro_licence` queda `null`.
 
 ```json
 {
@@ -249,6 +430,9 @@ Query opcional adicional:
 
 ### PUT `/api/clients/:id`
 
+Si un cliente `Tercero` pasa a `Comunero`, el backend asigna automaticamente el siguiente `nro_licence` disponible.
+Si un cliente `Comunero` pasa a `Tercero`, el sistema conserva la secuencia internamente por trazabilidad, pero la respuesta devuelve `nro_licence: null` mientras siga siendo `Tercero`.
+
 ```json
 {
   "fullName": "Juan Perez Quispe",
@@ -261,32 +445,28 @@ Query opcional adicional:
 
 ### DELETE `/api/clients/:id`
 
+Respuesta: `204 No Content`
+
 ## 7) Certificate Requests
 
 ### GET `/api/certificate-requests?page=1&limit=10`
 
-Query opcional adicional:
+### GET `/api/certificate-requests/download/:filename`
 
-- `status=Pendiente|Aprobada|Rechazada`
-
-### GET `/api/certificate-requests/role-view?page=1&limit=10`
+Descarga el PDF por nombre de archivo (ej: `solicitud-certificado-003223-26.pdf`). El PDF se sirve inline.
 
 ### GET `/api/certificate-requests/:id`
 
-### GET `/api/certificate-requests/:id/preview`
-
-### GET `/api/certificate-requests/:id/pdf`
-
-Genera el PDF con la plantilla formal de solicitud.
-
-Para mostrar el logo institucional, colocar el archivo exacto:
-
-- `src/assets/logo-comunidad-campesina-asia.png`
+Acepta tanto el `id` numerico como el `requestNumber` (ej: `000001` o `000001-26`).
 
 ### POST `/api/certificate-requests`
 
 El cliente titular se toma desde el objeto `client` del body.
+Si se envia `partnerClient` con datos, se registra como partner y se almacena su `partnerId`.
+`isComunero` determina el `clientType`: `true` -> `Comunero`, `false` -> `Tercero`.
 El campo `createdBy` se completa automaticamente con el usuario autenticado que realiza el registro.
+Si `isComunero=true`, el backend asigna automaticamente `nro_licence` al cliente si todavia no tiene uno.
+La misma regla aplica cuando el cliente se crea o actualiza indirectamente desde solicitudes.
 
 ```json
 {
@@ -298,13 +478,15 @@ El campo `createdBy` se completa automaticamente con el usuario autenticado que 
     "searchType": "Reniec",
     "fullName": "Arias Aburto, Olga Lidia",
     "documentNumber": "80093634",
-    "address": "Asia"
+    "address": "Asia",
+    "nro_licence": "0001"
   },
   "partnerClient": {
     "searchType": "Comunidad",
     "fullName": "",
     "documentNumber": "",
-    "address": ""
+    "address": "",
+    "nro_licence": null
   },
   "certificateTypes": [
     {
@@ -355,13 +537,15 @@ Estructura de respuesta de `GET /api/certificate-requests/:id`:
     "searchType": "Reniec",
     "fullName": "Arias Aburto, Olga Lidia",
     "documentNumber": "80093634",
-    "address": "Asia"
+    "address": "Asia",
+    "nro_licence": "0001"
   },
   "partnerClient": {
     "searchType": "Comunidad",
     "fullName": "",
     "documentNumber": "",
-    "address": ""
+    "address": "",
+    "nro_licence": null
   },
   "certificateTypes": [
     {
@@ -396,41 +580,66 @@ Estructura de respuesta de `GET /api/certificate-requests/:id`:
 
 ### DELETE `/api/certificate-requests/:id`
 
+Respuesta: `204 No Content`
+
 ## 8) Certificates
 
 ### GET `/api/certificates?page=1&limit=10`
 
 Filtros opcionales:
 
-- `code`
-- `name` (nombre de cliente)
-- `documentNumber`
-- `location`
-- `mz`
-- `lot`
-- `requestCode`
-- `status=PorFirmar|PorRecoger|Entregado`
+- `certificateNumber` — busqueda parcial del numero de certificado
+- `requestNumber` — busqueda por numero de solicitud asociado
+- `name` — nombre del propietario (busca en cliente y partner)
+- `documentNumber` — DNI del propietario (busca en cliente y partner)
+- `mz` — manzana
+- `lot` — lote
+- `status=Por Firmar|Por Recoger|Entregado`
+- `sectorId` — ID del sector
+- `terrainTypeId` — ID del tipo de terreno
+
+### GET `/api/certificates/download/:filename`
+
+Descarga el PDF por nombre de archivo (ej: `certificado-000001.pdf`). El PDF se sirve inline.
+Internamente busca el certificado por `certificateNumber` extrayendolo del nombre del archivo.
+
+### GET `/api/certificates/by-number/:number`
+
+Busca un certificado por su numero exacto (ej: `000001`). Util para el formulario de solicitudes de acta.
 
 ### GET `/api/certificates/:id`
 
-### GET `/api/certificates/:id/preview`
-
 ### GET `/api/certificates/:id/pdf`
+
+Descarga el PDF del certificado por ID. El PDF se sirve inline.
 
 ### POST `/api/certificates`
 
+`owners` es un array de objetos con `id` del cliente. El primer elemento es el propietario principal (`clientId`), el segundo (opcional) es el conyuge/partner (`partnerId`).
+`requestNumber` debe corresponder a una solicitud de certificado existente.
+`createdBy` se asigna automaticamente desde el token JWT.
+
 ```json
 {
-  "clientId": 1,
-  "requestId": 1,
-  "sectorId": 1,
-  "terrainTypeId": 1,
-  "location": "Zona A",
-  "mz": "MZ-01",
-  "lot": "L-10",
-  "status": "PorFirmar",
-  "issuedAt": "2026-05-16T00:00:00.000Z",
-  "deliveredAt": null
+  "owners": [{ "id": 1 }, { "id": 2 }],
+  "terrain": {
+    "terrainType": { "id": 1 },
+    "width": 10.5,
+    "length": 20.0,
+    "totalArea": 210.0
+  },
+  "location": {
+    "sectors": { "id": 1 },
+    "mz": "L-2",
+    "lot": "7"
+  },
+  "borders": {
+    "north": "LOTE 6",
+    "south": "LOTE 8",
+    "east": "LOTE 5",
+    "west": "CALLE FRANCISCO AVALOS"
+  },
+  "requestNumber": "003223-26"
 }
 ```
 
@@ -438,32 +647,110 @@ Filtros opcionales:
 
 ```json
 {
-  "sectorId": 1,
-  "terrainTypeId": 1,
-  "location": "Zona B",
-  "mz": "MZ-02",
-  "lot": "L-20",
-  "status": "PorRecoger",
-  "issuedAt": "2026-05-16T00:00:00.000Z",
-  "deliveredAt": null
+  "owners": [{ "id": 1 }],
+  "terrain": {
+    "terrainType": { "id": 1 },
+    "width": 12.0,
+    "length": 25.0,
+    "totalArea": 300.0
+  },
+  "location": {
+    "sectors": { "id": 2 },
+    "mz": "MZ-1",
+    "lot": "L-5"
+  },
+  "borders": {
+    "north": "CALLE LOS OLIVOS",
+    "south": "LOTE 3",
+    "east": "LOTE 4",
+    "west": "AV. PRINCIPAL"
+  },
+  "status": "Por Recoger"
+}
+```
+
+Estructura de respuesta de `GET /api/certificates/:id`:
+
+```json
+{
+  "id": 1,
+  "owners": [
+    {
+      "id": 1,
+      "fullName": "LUZ SELENE PALOMINO ALVAREZ",
+      "documentNumber": "30422693"
+    },
+    {
+      "id": 2,
+      "fullName": "CESAR AUGUSTO BARDALES ASTE",
+      "documentNumber": "42538515"
+    }
+  ],
+  "terrain": {
+    "terrainType": {
+      "id": 1,
+      "name": "VIVIENDA"
+    },
+    "width": 10.5,
+    "length": 20.0,
+    "totalArea": 210.0
+  },
+  "location": {
+    "sectors": {
+      "id": 1,
+      "name": "VIGARAY"
+    },
+    "mz": "L-2",
+    "lot": "7"
+  },
+  "borders": {
+    "north": "LOTE 6",
+    "south": "LOTE 8",
+    "east": "LOTE 5",
+    "west": "CALLE FRANCISCO AVALOS"
+  },
+  "certificateNumber": "000001",
+  "requestNumber": "003223-26",
+  "status": "Entregado",
+  "createdBy": {
+    "dni": "00000258",
+    "role": "ATENCION"
+  },
+  "createdAt": "2026-05-19T20:35:20Z",
+  "updatedAt": "2026-05-19T20:35:20Z"
 }
 ```
 
 ### DELETE `/api/certificates/:id`
 
-## 9) Assembly Record Requests
+Respuesta: `204 No Content`
+
+## 9) Assembly Record Requests (sin estado)
 
 ### GET `/api/assembly-record-requests?page=1&limit=10`
-
-Query opcional adicional:
-
-- `status=Pendiente|Aprobada|Rechazada`
 
 ### GET `/api/assembly-record-requests/:id`
 
 ### GET `/api/assembly-record-requests/:id/preview`
 
+Retorna un resumen de la solicitud:
+
+```json
+{
+  "code": "SOL-ACTA-000001",
+  "client": "Arias Aburto, Olga Lidia",
+  "certificateNumber": "000001",
+  "preview": "Solicitud SOL-ACTA-000001 basada en certificado 000001"
+}
+```
+
 ### GET `/api/assembly-record-requests/:id/pdf`
+
+Nota: Retorna el PDF en `inline` (visualizacion en navegador).
+
+### GET `/api/assembly-record-requests/download/:filename`
+
+Descarga un PDF previamente generado por su nombre de archivo. Ejemplo: `solicitud-acta-SOL-ACTA-000001.pdf`
 
 ### POST `/api/assembly-record-requests`
 
@@ -479,12 +766,13 @@ Query opcional adicional:
 
 ```json
 {
-  "description": "Solicitud validada",
-  "status": "Aprobada"
+  "description": "Solicitud validada"
 }
 ```
 
 ### DELETE `/api/assembly-record-requests/:id`
+
+Respuesta: `204 No Content`
 
 ## 10) Dashboard
 
@@ -497,19 +785,72 @@ Devuelve totales de:
 - terrainTypes
 - sectors
 
+### GET `/api/dashboard/status-breakdown`
+
+Devuelve conteo de certificados agrupados por estado (`PorFirmar`, `PorRecoger`, `Entregado`), cada uno con su color.
+
+Query params opcionales:
+
+- `from=YYYY-MM-DD` — filtrar desde esta fecha (inicio del dia UTC)
+- `to=YYYY-MM-DD` — filtrar hasta esta fecha (fin del dia UTC)
+
+Respuesta:
+
+```json
+[
+  { "name": "Por firmar", "value": 5, "color": "oklch(0.6 0.22 25)" },
+  { "name": "Por recoger", "value": 3, "color": "oklch(0.78 0.16 75)" },
+  { "name": "Entregado", "value": 12, "color": "oklch(0.65 0.16 155)" }
+]
+```
+
+### GET `/api/dashboard/monthly-activity`
+
+Devuelve certificados, solicitudes de certificados y solicitudes de acta agrupados por mes.
+
+Query params opcionales (aplica tambien a status-breakdown):
+
+- `from=YYYY-MM-DD` — filtrar desde esta fecha (inicio del dia UTC)
+- `to=YYYY-MM-DD` — filtrar hasta esta fecha (fin del dia UTC)
+
+Respuesta:
+
+```json
+[
+  { "mes": "Ene", "certificados": 120, "solicitudesCert": 60, "solicitudesActa": 25 },
+  { "mes": "Feb", "certificados": 145, "solicitudesCert": 71, "solicitudesActa": 30 }
+]
+```
+
+### GET `/api/dashboard/recent-activity`
+
+Devuelve las ultimas 5 actividades (mezcla de certificados creados, solicitudes registradas y actas solicitadas), ordenadas por fecha descendente.
+
+Respuesta:
+
+```json
+[
+  {
+    "id": "cert-1",
+    "usuario": "Admin",
+    "accion": "generó el certificado 000001 para LUZ SELENE PALOMINO ALVAREZ",
+    "cuando": "2026-05-19T20:35:20.000Z"
+  }
+]
+```
+
 ## 11) Reports
 
 ### GET `/api/reports/certificates`
 
 Exporta Excel (`.xlsx`) y acepta los mismos filtros que `GET /api/certificates`:
 
-- `code`, `name`, `documentNumber`, `location`, `mz`, `lot`, `requestCode`, `status`
+- `certificateNumber`, `requestNumber`, `name`, `documentNumber`, `mz`, `lot`, `status`
 
 ## Valores permitidos (enums)
 
 - `clientType`: `Comunero`, `Tercero`
-- `certificate status`: `PorFirmar`, `PorRecoger`, `Entregado`
-- `request status`: `Pendiente`, `Aprobada`, `Rechazada`
+- `CertificateStatus`: `Por Firmar`, `Por Recoger`, `Entregado`
 
 ## Roles base que se crean automaticamente
 
@@ -519,12 +860,11 @@ Exporta Excel (`.xlsx`) y acepta los mismos filtros que `GET /api/certificates`:
 
 ## Orden recomendado para pruebas 1 a 1
 
-1. `POST /api/auth/login` (guardar token)
-2. Crear usuarios con `POST /api/users`
-3. Crear roles (`/api/roles`) si necesitas roles nuevos
-4. Crear catalogos: sectors + terrain-types
-5. Crear clients
-6. Crear certificate-requests
-7. Crear certificates
-8. Crear assembly-record-requests
-9. Probar previews/pdf/reportes/dashboard
+1. `POST /api/auth/login` (guardar cookie `token` o reutilizarla en Postman)
+2. `POST /api/users` (crear usuario, publico)
+3. Crear catalogos: sectors + terrain-types
+4. Crear clients
+5. Crear certificate-requests
+6. Crear certificates
+7. Crear assembly-record-requests
+8. Probar previews/pdf/reportes/dashboard

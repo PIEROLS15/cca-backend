@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const { getRoleGroup } = require("../../../utils/access-control.utils");
 
 const createAccessToken = (user) =>
   jwt.sign(
@@ -6,6 +7,7 @@ const createAccessToken = (user) =>
       sub: user.id,
       role: user.role?.name,
       roleId: user.role?.id,
+      roleGroup: getRoleGroup(user.role?.name),
       permissions: user.role?.rolePermissions?.map((item) => item.permission.key) || [],
       username: user.username,
     },
@@ -22,11 +24,12 @@ const sanitizeUser = (user) => ({
   isActive: user.isActive,
   role: user.role
     ? {
-        id: user.role.id,
-        name: user.role.name,
-        description: user.role.description,
-        permissions: user.role.rolePermissions?.map((item) => item.permission.key) || [],
-      }
+      id: user.role.id,
+      name: user.role.name,
+      description: user.role.description,
+      group: getRoleGroup(user.role.name),
+      permissions: user.role.rolePermissions?.map((item) => item.permission.key) || [],
+    }
     : null,
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,

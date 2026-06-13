@@ -1,70 +1,59 @@
-const buildRequestCode = (sequence) => `SolCer${String(sequence).padStart(6, "0")}`;
+const { formatClientResponse } = require("../../clients/utils/clients.utils");
+const {
+  normalizeAttachments,
+  normalizeCertificateTypes,
+  normalizeRequestDestination,
+} = require("./certificate-request-legacy.utils");
 
 const buildRequestNumber = (sequence, date = new Date()) => {
   const year = String(date.getFullYear()).slice(-2);
   return `${String(sequence).padStart(6, "0")}-${year}`;
 };
 
-const normalizeValueToken = (value) => {
-  if (!value) {
-    return "";
-  }
+const formatCertificateRequestResponse = (request) => {
+  const client = formatClientResponse(request.client || {}) || {};
+  const partner = formatClientResponse(request.partner || {}) || {};
+  const user = request.user || {};
+  const legacyPayload = request.legacyPayload || null;
 
-  return String(value)
-    .trim()
-    .split(/[_\s-]+/)
-    .filter(Boolean)
-    .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1).toLowerCase())
-    .join("");
+  return {
+    id: request.id,
+    requestNumber: request.requestNumber,
+    isComunero: client.clientType === "Comunero",
+    destination: normalizeRequestDestination(request.destination, legacyPayload?.destination),
+    requestDescription: request.requestDescription || request.description || legacyPayload?.requestDescription || legacyPayload?.description || "",
+    sectorLocation: request.sectorLocation || legacyPayload?.sectorLocation || "",
+    client: {
+      id: client.id || null,
+      searchType: "Reniec",
+      fullName: client.fullName || "",
+      documentNumber: client.documentNumber || "",
+      address: client.address || "",
+      nro_licence: client.nro_licence || null,
+    },
+    partnerClient: {
+      id: partner.id || null,
+      searchType: partner.id ? "Reniec" : "",
+      fullName: partner.fullName || "",
+      documentNumber: partner.documentNumber || "",
+      address: partner.address || "",
+      nro_licence: partner.nro_licence || null,
+    },
+    certificateTypes: normalizeCertificateTypes(request.certificateTypes || [], legacyPayload),
+    exposure: request.exposure || legacyPayload?.exposure || "",
+    attachments: normalizeAttachments(request.attachments || [], legacyPayload),
+    createdBy: {
+      dni: user?.dni || "",
+      role: user?.role?.name || "",
+    },
+    legacyPayload,
+    createdAt: request.createdAt,
+    updatedAt: request.updatedAt,
+  };
 };
 
-const normalizeCertificateTypes = (items = []) =>
-  items.map((item) => ({
-    type: normalizeValueToken(item.type),
-    otherType: item.otherType || undefined,
-  }));
-
-const normalizeAttachments = (items = []) =>
-  items.map((item) => ({
-    type: normalizeValueToken(item.type),
-    phoneNumber: item.phoneNumber || undefined,
-  }));
-
-const formatCertificateRequestResponse = (request) => ({
-  id: request.id,
-  requestNumber: request.requestNumber,
-  isComunero: request.isComunero,
-  destination: request.destination || "",
-  status: request.status,
-  requestDescription: request.requestDescription || request.description || "",
-  sectorLocation: request.sectorLocation || "",
-  client: {
-    searchType: request.clientSearchType || "",
-    fullName: request.clientFullName || request.client?.fullName || "",
-    documentNumber: request.clientDocumentNumber || request.client?.documentNumber || "",
-    address: request.clientAddress || request.client?.address || "",
-  },
-  partnerClient: {
-    searchType: request.partnerSearchType || "",
-    fullName: request.partnerFullName || "",
-    documentNumber: request.partnerDocumentNumber || "",
-    address: request.partnerAddress || "",
-  },
-  certificateTypes: Array.isArray(request.certificateTypes) ? request.certificateTypes : [],
-  exposure: request.exposure || "",
-  attachments: Array.isArray(request.attachments) ? request.attachments : [],
-  createdBy: {
-    dni: request.createdByDni || request.user?.dni || "",
-    role: request.createdByRole || request.user?.role?.name || "",
-  },
-  createdAt: request.createdAt,
-  updatedAt: request.updatedAt,
-});
-
 module.exports = {
-  buildRequestCode,
   buildRequestNumber,
-  normalizeValueToken,
   normalizeCertificateTypes,
   normalizeAttachments,
   formatCertificateRequestResponse,

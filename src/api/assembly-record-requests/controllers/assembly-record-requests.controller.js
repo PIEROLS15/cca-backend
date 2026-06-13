@@ -6,9 +6,9 @@ const { buildAssemblyRecordRequestPdf } = require("../utils/assembly-record-requ
 
 const listAssemblyRecordRequests = asyncHandler(async (req, res) => {
   const data = await assemblyRecordRequestsService.listAssemblyRecordRequests({
-    status: req.query.status,
     page: req.query.page,
     limit: req.query.limit,
+    search: req.query.search,
   });
   return sendSuccess(res, {
     message: "Solicitudes de acta encontradas correctamente",
@@ -29,9 +29,9 @@ const createAssemblyRecordRequest = asyncHandler(async (req, res) => {
 
   const request = await assemblyRecordRequestsService.createAssemblyRecordRequest(
     {
+      ...req.body,
       clientId: Number(clientId),
       certificateId: Number(certificateId),
-      description: req.body.description,
     },
     req.user?.sub
   );
@@ -55,10 +55,14 @@ const previewAssemblyRecordRequest = asyncHandler(async (req, res) => {
   res.json({
     code: request.code,
     client: request.client.fullName,
-    certificateCode: request.certificate.code,
-    status: request.status,
-    preview: `Solicitud ${request.code} basada en certificado ${request.certificate.code}`,
+    certificateNumber: request.certificate.certificateNumber,
+    preview: `Solicitud ${request.code} basada en certificado ${request.certificate.certificateNumber}`,
   });
+});
+
+const previewDeleteAssemblyRecordRequest = asyncHandler(async (req, res) => {
+  const preview = await assemblyRecordRequestsService.getAssemblyRecordRequestDeletePreview(Number(req.params.id));
+  res.json(preview);
 });
 
 const downloadAssemblyRecordRequestPdf = asyncHandler(async (req, res) => {
@@ -66,7 +70,18 @@ const downloadAssemblyRecordRequestPdf = asyncHandler(async (req, res) => {
   const pdfBuffer = await buildAssemblyRecordRequestPdf(request);
 
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="solicitud-acta-${request.code}.pdf"`);
+  res.setHeader("Content-Disposition", `inline; filename="solicitud-acta-${request.code}.pdf"`);
+  res.send(pdfBuffer);
+});
+
+const downloadAssemblyRecordRequestPdfByFilename = asyncHandler(async (req, res) => {
+  const filename = req.params.filename || "";
+  const code = filename.replace(/^solicitud-acta-/, "").replace(/\.pdf$/, "");
+  const request = await assemblyRecordRequestsService.getAssemblyRecordRequestByCode(code);
+  const pdfBuffer = await buildAssemblyRecordRequestPdf(request);
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
   res.send(pdfBuffer);
 });
 
@@ -77,5 +92,7 @@ module.exports = {
   updateAssemblyRecordRequest,
   deleteAssemblyRecordRequest,
   previewAssemblyRecordRequest,
+  previewDeleteAssemblyRecordRequest,
   downloadAssemblyRecordRequestPdf,
+  downloadAssemblyRecordRequestPdfByFilename,
 };

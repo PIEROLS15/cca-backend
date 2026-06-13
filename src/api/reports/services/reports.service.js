@@ -9,9 +9,15 @@ const exportCertificatesReport = async (query) => {
     where,
     include: {
       client: true,
-      request: true,
+      partner: true,
+      owners: { include: { client: true }, orderBy: { order: "asc" } },
+      sector: true,
+      terrainType: true,
     },
-    orderBy: { id: "desc" },
+    orderBy: [
+      { createdAt: "desc" },
+      { certificateNumber: "desc" },
+    ],
   });
 
   return buildCertificatesWorkbook(certificates);

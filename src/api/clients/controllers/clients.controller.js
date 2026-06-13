@@ -2,12 +2,15 @@ const asyncHandler = require("../../../utils/async-handler");
 const HttpError = require("../../../utils/http-error");
 const { sendSuccess } = require("../../../utils/api-response");
 const clientsService = require("../services/clients.service");
+const reniecService = require("../services/reniec.service");
 
 const listClients = asyncHandler(async (req, res) => {
   const data = await clientsService.listClients({
     clientType: req.query.clientType,
     page: req.query.page,
     limit: req.query.limit,
+    search: req.query.search,
+    documentNumber: req.query.documentNumber,
   });
   return sendSuccess(res, {
     message: "Clientes encontrados correctamente",
@@ -21,9 +24,9 @@ const getClientById = asyncHandler(async (req, res) => {
 });
 
 const createClient = asyncHandler(async (req, res) => {
-  const { fullName, documentNumber, clientType } = req.body;
-  if (!fullName || !documentNumber || !clientType) {
-    throw new HttpError(400, "fullName, documentNumber y clientType son obligatorios");
+  const { fullName, documentNumber, isComunero } = req.body;
+  if (!fullName || !documentNumber || isComunero === undefined) {
+    throw new HttpError(400, "fullName, documentNumber e isComunero son obligatorios");
   }
 
   const client = await clientsService.createClient(req.body);
@@ -40,10 +43,40 @@ const deleteClient = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
+const previewDeleteClient = asyncHandler(async (req, res) => {
+  const preview = await clientsService.getClientDeletePreview(Number(req.params.id));
+  res.json(preview);
+});
+
+const searchByDocument = asyncHandler(async (req, res) => {
+  const { document } = req.params;
+
+  if (!document || document.length < 3) {
+    throw new HttpError(400, "Ingrese al menos 3 caracteres para buscar");
+  }
+
+  const client = await clientsService.searchByDocument(document);
+  res.json(client);
+});
+
+const searchReniec = asyncHandler(async (req, res) => {
+  const { document } = req.params;
+
+  if (!document || document.length < 8) {
+    throw new HttpError(400, "Ingrese un DNI válido (8 dígitos)");
+  }
+
+  const person = await reniecService.searchByDocument(document);
+  res.json(person);
+});
+
 module.exports = {
   listClients,
   getClientById,
   createClient,
   updateClient,
   deleteClient,
+  previewDeleteClient,
+  searchByDocument,
+  searchReniec,
 };

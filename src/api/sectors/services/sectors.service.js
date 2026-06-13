@@ -5,14 +5,21 @@ const { normalizeName } = require("../utils/sectors.utils");
 
 const listSectors = async (query) => {
   const { page, limit, skip } = getPaginationParams(query);
+  const { search } = query;
+
+  const where = {};
+  if (search) {
+    where.name = { contains: search, mode: "insensitive" };
+  }
 
   const [docs, total] = await Promise.all([
     prisma.sector.findMany({
+      where,
       orderBy: { id: "desc" },
       skip,
       take: limit,
     }),
-    prisma.sector.count(),
+    prisma.sector.count({ where }),
   ]);
 
   return buildPaginationResult({
@@ -45,15 +52,9 @@ const updateSector = async (id, { name }) => {
   });
 };
 
-const deleteSector = async (id) => {
-  await getSectorById(id);
-  await prisma.sector.delete({ where: { id } });
-};
-
 module.exports = {
   listSectors,
   getSectorById,
   createSector,
   updateSector,
-  deleteSector,
 };

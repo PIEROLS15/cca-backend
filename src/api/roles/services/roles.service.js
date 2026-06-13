@@ -2,6 +2,7 @@ const prisma = require("../../../config/prisma");
 const HttpError = require("../../../utils/http-error");
 const { buildPaginationResult, getPaginationParams } = require("../../../utils/pagination");
 const { ensureBaseRoles } = require("../../../utils/role.utils");
+const { makeDeletionPreview, makeImpactItem } = require("../../../utils/deletion-preview");
 const { sanitizeRole } = require("../utils/roles.utils");
 
 const roleInclude = {
@@ -81,6 +82,36 @@ const getRoleById = async (id) => {
   return sanitizeRole(role);
 };
 
+const getRoleDeletePreview = async (id) => {
+  const role = await prisma.role.findUnique({
+    where: { id },
+    select: {
+      name: true,
+      _count: {
+        select: {
+          users: true,
+          rolePermissions: true,
+        },
+      },
+    },
+  });
+
+  if (!role) {
+    throw new HttpError(404, "Rol no encontrado");
+  }
+
+  return makeDeletionPreview({
+    entityLabel: "rol",
+    itemName: role.name,
+    willDelete: role._count.rolePermissions > 0
+      ? [makeImpactItem({ label: "Permisos asociados", count: role._count.rolePermissions })]
+      : [],
+    willBlock: role._count.users > 0
+      ? [makeImpactItem({ label: "Usuarios asignados", count: role._count.users })]
+      : [],
+  });
+};
+
 const createRole = async ({ name, description, permissions }) => {
   const existingRole = await prisma.role.findUnique({ where: { name } });
   if (existingRole) {
@@ -142,13 +173,8 @@ const updateRole = async (id, payload) => {
 };
 
 const deleteRole = async (id) => {
-  const role = await prisma.role.findUnique({ where: { id } });
-  if (!role) {
-    throw new HttpError(404, "Rol no encontrado");
-  }
-
-  const usersCount = await prisma.user.count({ where: { roleId: id } });
-  if (usersCount > 0) {
+  const preview = await getRoleDeletePreview(id);
+  if (!preview.canDelete) {
     throw new HttpError(409, "No se puede eliminar el rol porque tiene usuarios asociados");
   }
 
@@ -158,6 +184,7 @@ const deleteRole = async (id) => {
 module.exports = {
   listRoles,
   getRoleById,
+  getRoleDeletePreview,
   createRole,
   updateRole,
   deleteRole,

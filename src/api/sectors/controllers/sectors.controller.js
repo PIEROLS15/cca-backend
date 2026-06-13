@@ -32,15 +32,9 @@ const updateSector = asyncHandler(async (req, res) => {
   res.json(sector);
 });
 
-const deleteSector = asyncHandler(async (req, res) => {
-  await sectorsService.deleteSector(Number(req.params.id));
-  res.status(204).send();
-});
-
 module.exports = {
   listSectors,
   getSectorById,
   createSector,
   updateSector,
-  deleteSector,
 };
