@@ -212,6 +212,7 @@ docker compose -f docker-compose.db.yml up -d
 La base de datos se levanta con `docker-compose.db.yml` y el backend de produccion con `docker-compose.prod.yml`.
 El workflow `deploy-backend.yml` sube un release nuevo, valida `/health`, hace backup de la DB, aplica `prisma migrate deploy` y solo despues promueve el release.
 Recuerda que `BACKEND_PORT` define el puerto expuesto en el host, mientras que el backend dentro del contenedor escucha siempre en `9001`.
+Para conectar DBeaver usa SSH tunnel contra `127.0.0.1:${POSTGRES_PORT}` en el VPS; el puerto solo queda abierto en localhost.
 
 ### Migrar manualmente
 
