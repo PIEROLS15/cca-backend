@@ -103,6 +103,10 @@ DB_PROJECT=${DB_PROJECT:-cca-backend-db}
 
 [ -f "$SHARED_DIR/.env" ] || fail "Falta el archivo compartido de entorno: $SHARED_DIR/.env"
 
+set -a
+. "$SHARED_DIR/.env"
+set +a
+
 mkdir -p "$BACKUP_DIR"
 cd "$RELEASE_DIR"
 ln -sfn "$SHARED_DIR/.env" .env
