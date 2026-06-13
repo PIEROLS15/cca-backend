@@ -8,6 +8,8 @@ const {
 } = require("../../../constants/terrain-type-configs");
 const { normalizeName, formatTerrainTypeResponse } = require("../utils/terrain-types.utils");
 
+const canDeleteCatalogResource = (roleGroup) => [1, 2].includes(roleGroup);
+
 const terrainTypeInclude = {
   config: true,
 };
@@ -66,7 +68,11 @@ const getTerrainTypeById = async (id) => {
   return formatTerrainTypeResponse(terrainType);
 };
 
-const getTerrainTypeDeletePreview = async (id) => {
+const getTerrainTypeDeletePreview = async (id, roleGroup) => {
+  if (!canDeleteCatalogResource(roleGroup)) {
+    throw new HttpError(403, "No tienes permisos para eliminar tipos de terreno");
+  }
+
   const terrainType = await prisma.terrainType.findUnique({
     where: { id },
     select: {
@@ -128,8 +134,12 @@ const updateTerrainType = async (id, { name, terrainTypeConfigId }) => {
   return formatTerrainTypeResponse(terrainType);
 };
 
-const deleteTerrainType = async (id) => {
-  const preview = await getTerrainTypeDeletePreview(id);
+const deleteTerrainType = async (id, roleGroup) => {
+  if (!canDeleteCatalogResource(roleGroup)) {
+    throw new HttpError(403, "No tienes permisos para eliminar tipos de terreno");
+  }
+
+  const preview = await getTerrainTypeDeletePreview(id, roleGroup);
   if (!preview.canDelete) {
     throw new HttpError(409, "No se puede eliminar el tipo de terreno porque tiene certificados asociados");
   }
