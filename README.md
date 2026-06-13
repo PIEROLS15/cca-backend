@@ -182,6 +182,36 @@ Esto levanta:
 
 El arranque ya no ejecuta migraciones ni seeds automaticamente.
 
+### Despliegue en VPS
+
+Para produccion usamos release por carpeta y rollback seguro.
+
+Estructura esperada:
+
+```bash
+/opt/app/backend/current
+/opt/app/backend/releases/<sha>
+/opt/app/backend/shared/.env
+/opt/app/backups/db
+```
+
+Antes del primer deploy crea el archivo `/opt/app/backend/shared/.env` con las variables de entorno reales del backend y la base de datos, usando `.env.example` como base.
+
+Tambien debes crear la red Docker compartida una sola vez:
+
+```bash
+docker network create cca_backend_net
+```
+
+Y levantar la base de datos una sola vez:
+
+```bash
+docker compose -f docker-compose.db.yml up -d
+```
+
+La base de datos se levanta con `docker-compose.db.yml` y el backend de produccion con `docker-compose.prod.yml`.
+El workflow `deploy-backend.yml` sube un release nuevo, valida `/health`, hace backup de la DB, aplica `prisma migrate deploy` y solo despues promueve el release.
+
 ### Migrar manualmente
 
 ```bash

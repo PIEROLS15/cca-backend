@@ -1,0 +1,28 @@
+services:
+  backend:
+    build: .
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-9001}:9001"
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PORT: ${BACKEND_PORT:-9001}
+      TZ: America/Lima
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public"
+      JWT_SECRET: ${JWT_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL}
+      RENIEC_PROVIDER: ${RENIEC_PROVIDER}
+      RENIEC_CODART_TOKEN: ${RENIEC_CODART_TOKEN}
+      RENIEC_CODART_URL: ${RENIEC_CODART_URL}
+      RENIEC_DECOLECTA_TOKEN: ${RENIEC_DECOLECTA_TOKEN}
+      RENIEC_DECOLECTA_URL: ${RENIEC_DECOLECTA_URL}
+      API_BASE_URL: ${API_BASE_URL}
+      BEARER_TOKEN: ${BEARER_TOKEN}
+    networks:
+      - backend-net
+
+networks:
+  backend-net:
+    external: true
+    name: cca_backend_net
