@@ -29,27 +29,81 @@ Incluye autenticacion JWT, control por roles/permisos, generacion de PDF y repor
 ```bash
 prisma/
   migrations/               # Migraciones de base de datos
+  seed/                     # Scripts de carga inicial de datos
   schema.prisma             # Modelos y enums
 src/
   api/                      # Modulos de negocio por recurso
     auth/
+      controllers/
+      routes/
+      services/
+      utils/
     users/
+      controllers/
+      routes/
+      services/
+      utils/
     roles/
+      controllers/
+      routes/
+      services/
+      utils/
     clients/
+      controllers/
+      routes/
+      services/
+      utils/
     certificate-requests/
+      controllers/
+      routes/
+      services/
+      utils/
     certificates/
+      controllers/
+      routes/
+      services/
+      utils/
     assembly-record-requests/
+      controllers/
+      routes/
+      services/
+      utils/
     sectors/
+      controllers/
+      routes/
+      services/
+      utils/
     terrain-types/
+      controllers/
+      routes/
+      services/
+      utils/
     reports/
+      controllers/
+      routes/
+      services/
+      utils/
     dashboard/
+      controllers/
+      routes/
+      services/
+      utils/
+    public/
+      controllers/
+      routes/
   config/
-    prisma.js               # Instancia Prisma Client
-  middlewares/              # auth, roles, manejo de errores
-  pdf/                      # Plantillas PDF
-  utils/                    # Respuestas, paginacion, helpers
-  app.js                    # Configuracion Express
-  server.js                 # Punto de arranque
+    prisma.js                 # Instancia Prisma Client
+  constants/                  # Constantes de dominio
+  middlewares/                # auth, roles, manejo de errores
+  pdf/                        # Plantillas PDF
+  utils/                      # Respuestas, paginacion, helpers
+  assets/                     # Recursos estaticos del backend
+  app.js                      # Configuracion Express
+  server.js                   # Punto de arranque
+Dockerfile
+docker-compose.yml
+docker-entrypoint.sh
+API-ENDPOINTS-BACKEND.md
 ```
 
 ---
@@ -124,7 +178,7 @@ docker compose up -d --build
 
 Esto levanta:
 - **PostgreSQL 16** en el puerto configurado (`POSTGRES_PORT`)
-- **Backend** en el puerto configurado (`BACKEND_PORT`)
+- **Backend** en el puerto interno `9001` y expuesto en el puerto configurado (`BACKEND_PORT`)
 
 El arranque ya no ejecuta migraciones ni seeds automaticamente.
 
@@ -160,6 +214,28 @@ Los siguientes datos se importan con `docker compose exec backend npm run prisma
 
 ---
 
+## CI
+
+El backend incluye un workflow de GitHub Actions en `.github/workflows/ci.yml`.
+
+### Disparadores
+
+- `push` a `main` y `dev`
+- `pull_request` hacia `main` y `dev`
+
+### Pasos del pipeline
+
+1. Checkout del repositorio.
+2. Configuracion de `pnpm` 10.
+3. Configuracion de Node.js 22 con cache de `pnpm`.
+4. Instalacion con `pnpm install --frozen-lockfile`.
+5. Generacion del Prisma Client.
+6. Aplicacion de migraciones con `prisma migrate deploy`.
+7. Verificacion de version de Prisma.
+8. Ejecucion condicional de `lint`, `build` y `test` si existen scripts.
+
+---
+
 ## Desarrollo
 
 Inicia el servidor en modo desarrollo:
@@ -181,11 +257,13 @@ GET /health
 ## Scripts disponibles
 
 ```bash
-pnpm run dev               # Ejecuta con nodemon
-pnpm run start             # Ejecuta en modo produccion
-pnpm run prisma:generate   # Genera Prisma Client
-pnpm run prisma:migrate    # Ejecuta prisma migrate dev
-pnpm run prisma:studio     # Abre Prisma Studio
+pnpm run dev                # Ejecuta con nodemon
+pnpm run start              # Ejecuta en modo produccion
+pnpm run prisma:generate    # Genera Prisma Client
+pnpm run prisma:migrate     # Ejecuta prisma migrate dev
+pnpm run prisma:migrate:deploy # Aplica migraciones en entornos de despliegue
+pnpm run prisma:seed        # Ejecuta el seed del backend
+pnpm run prisma:studio      # Abre Prisma Studio
 ```
 
 ---
