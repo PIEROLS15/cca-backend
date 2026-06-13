@@ -17,7 +17,7 @@ const getSectorById = asyncHandler(async (req, res) => {
 });
 
 const previewDeleteSector = asyncHandler(async (req, res) => {
-  const preview = await sectorsService.getSectorDeletePreview(Number(req.params.id));
+  const preview = await sectorsService.getSectorDeletePreview(Number(req.params.id), req.user?.roleGroup);
   res.json(preview);
 });
 
@@ -38,7 +38,7 @@ const updateSector = asyncHandler(async (req, res) => {
 });
 
 const deleteSector = asyncHandler(async (req, res) => {
-  await sectorsService.deleteSector(Number(req.params.id));
+  await sectorsService.deleteSector(Number(req.params.id), req.user?.roleGroup);
   res.status(204).send();
 });
 

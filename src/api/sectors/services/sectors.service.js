@@ -4,6 +4,8 @@ const { buildPaginationResult, getPaginationParams } = require("../../../utils/p
 const { makeDeletionPreview, makeImpactItem } = require("../../../utils/deletion-preview");
 const { normalizeName } = require("../utils/sectors.utils");
 
+const canDeleteCatalogResource = (roleGroup) => [1, 2].includes(roleGroup);
+
 const listSectors = async (query) => {
   const { page, limit, skip } = getPaginationParams(query);
   const { search } = query;
@@ -39,7 +41,11 @@ const getSectorById = async (id) => {
   return sector;
 };
 
-const getSectorDeletePreview = async (id) => {
+const getSectorDeletePreview = async (id, roleGroup) => {
+  if (!canDeleteCatalogResource(roleGroup)) {
+    throw new HttpError(403, "No tienes permisos para eliminar sectores");
+  }
+
   const sector = await prisma.sector.findUnique({
     where: { id },
     select: {
@@ -79,8 +85,12 @@ const updateSector = async (id, { name }) => {
   });
 };
 
-const deleteSector = async (id) => {
-  const preview = await getSectorDeletePreview(id);
+const deleteSector = async (id, roleGroup) => {
+  if (!canDeleteCatalogResource(roleGroup)) {
+    throw new HttpError(403, "No tienes permisos para eliminar sectores");
+  }
+
+  const preview = await getSectorDeletePreview(id, roleGroup);
   if (!preview.canDelete) {
     throw new HttpError(409, "No se puede eliminar el sector porque tiene certificados asociados");
   }
