@@ -17,7 +17,7 @@ const getTerrainTypeById = asyncHandler(async (req, res) => {
 });
 
 const previewDeleteTerrainType = asyncHandler(async (req, res) => {
-  const preview = await terrainTypesService.getTerrainTypeDeletePreview(Number(req.params.id));
+  const preview = await terrainTypesService.getTerrainTypeDeletePreview(Number(req.params.id), req.user?.roleGroup);
   res.json(preview);
 });
 
@@ -38,7 +38,7 @@ const updateTerrainType = asyncHandler(async (req, res) => {
 });
 
 const deleteTerrainType = asyncHandler(async (req, res) => {
-  await terrainTypesService.deleteTerrainType(Number(req.params.id));
+  await terrainTypesService.deleteTerrainType(Number(req.params.id), req.user?.roleGroup);
   res.status(204).send();
 });
 
