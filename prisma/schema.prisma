@@ -156,6 +156,12 @@ model CertificateRequest {
   certificates Certificate[]
 }
 
+model RequestNumberCounter {
+  key       String   @id
+  value     Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
 model Certificate {
   id                Int               @id @default(autoincrement())
   certificateNumber String            @unique
