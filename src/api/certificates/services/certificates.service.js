@@ -1,7 +1,9 @@
 const { randomUUID } = require("crypto");
+const { Prisma } = require("@prisma/client");
 const prisma = require("../../../config/prisma");
 const HttpError = require("../../../utils/http-error");
 const { buildPaginationResult, getPaginationParams } = require("../../../utils/pagination");
+const { formatCertificateSequence } = require("../../../utils/certificate-range.utils");
 const {
   normalizeCertificateStatus,
   normalizeTerrainMeasurementMode,
@@ -49,6 +51,63 @@ const syncCertificateOwners = async (tx, certificateId, ownerIds) => {
       source: index === 0 ? "primary" : index === 1 ? "partner" : `owner-${index + 1}`,
     })),
   });
+};
+
+const MAX_CERTIFICATE_WRITE_RETRIES = 3;
+
+const runCertificateWriteTransaction = async (handler) => {
+  let attempt = 0;
+
+  while (attempt < MAX_CERTIFICATE_WRITE_RETRIES) {
+    try {
+      return await prisma.$transaction(
+        async (tx) => handler(tx),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      attempt += 1;
+
+      if (error?.code !== "P2034" || attempt >= MAX_CERTIFICATE_WRITE_RETRIES) {
+        throw error;
+      }
+    }
+  }
+};
+
+const reserveCertificateNumberForUser = async (tx, userId) => {
+  const user = await tx.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      certificateRangeStart: true,
+      certificateRangeEnd: true,
+      lastCertificate: true,
+    },
+  });
+
+  if (!user) {
+    throw new HttpError(404, "Usuario no encontrado");
+  }
+
+  if (user.certificateRangeStart == null || user.certificateRangeEnd == null) {
+    throw new HttpError(409, "El usuario no tiene un limite de certificados asignado");
+  }
+
+  const currentLast = user.lastCertificate == null
+    ? user.certificateRangeStart - 1
+    : Math.max(Number(user.lastCertificate), user.certificateRangeStart - 1);
+  const nextSequence = currentLast + 1;
+
+  if (nextSequence < user.certificateRangeStart || nextSequence > user.certificateRangeEnd) {
+    throw new HttpError(409, "El usuario ya alcanzo su limite de certificados");
+  }
+
+  await tx.user.update({
+    where: { id: userId },
+    data: { lastCertificate: nextSequence },
+  });
+
+  return nextSequence;
 };
 
 const resolveOwnerClients = async (tx, owners = []) => {
@@ -105,16 +164,6 @@ const resolveOwnerClients = async (tx, owners = []) => {
   }
 
   return resolved;
-};
-
-const nextCertificateNumber = async () => {
-  const last = await prisma.certificate.findFirst({
-    orderBy: { certificateNumber: "desc" },
-    select: { certificateNumber: true },
-  });
-
-  const lastNum = last ? parseInt(last.certificateNumber, 10) : 0;
-  return String(lastNum + 1).padStart(6, "0");
 };
 
 const listCertificates = async (query) => {
@@ -188,12 +237,7 @@ const createCertificate = async (payload, userId) => {
     throw new HttpError(401, "Usuario autenticado requerido");
   }
 
-  const certificateNumber = await nextCertificateNumber();
-  const statusNormalized = normalizeCertificateStatus(payload.status) || "PorFirmar";
-  const measurementModeUsed = normalizeTerrainMeasurementMode(payload.terrain?.measurementModeUsed)
-    || deriveTerrainMeasurementMode(payload.terrain);
-
-  const certificate = await prisma.$transaction(async (tx) => {
+  const certificate = await runCertificateWriteTransaction(async (tx) => {
     const ownerClients = await resolveOwnerClients(tx, payload.owners || []);
     const ownerIds = ownerClients.map((owner) => owner.id);
 
@@ -228,6 +272,15 @@ const createCertificate = async (payload, userId) => {
     if (!(await tx.sector.findUnique({ where: { id: sectorId } }))) {
       throw new HttpError(404, "Sector no encontrado");
     }
+
+    const certificateNumber = formatCertificateSequence(await reserveCertificateNumberForUser(tx, userId));
+    if (!certificateNumber) {
+      throw new Error("No se pudo generar el numero de certificado");
+    }
+
+    const statusNormalized = normalizeCertificateStatus(payload.status) || "PorFirmar";
+    const measurementModeUsed = normalizeTerrainMeasurementMode(payload.terrain?.measurementModeUsed)
+      || deriveTerrainMeasurementMode(payload.terrain);
 
     const created = await tx.certificate.create({
       data: {

@@ -162,16 +162,22 @@ const buildCertificatePdf = async (certificate) => {
 
       const borders = [
         { label: "POR EL NORTE", value: certificate.borders?.north },
-        { label: "POR EL SUR  ", value: certificate.borders?.south },
-        { label: "POR EL ESTE ", value: certificate.borders?.east },
+        { label: "POR EL SUR", value: certificate.borders?.south },
+        { label: "POR EL ESTE", value: certificate.borders?.east },
         { label: "POR EL OESTE", value: certificate.borders?.west },
       ];
+      const borderLabelX = leftMargin;
+      const borderLabelWidth = 96;
+      const borderColonX = borderLabelX + borderLabelWidth + 2;
+      const borderValueX = borderColonX + 10;
       let borderY = doc.y + 4;
       borders.forEach((b) => {
-        doc.font("Times-Roman").text(`${b.label}`, leftMargin, borderY, { continued: true });
-        doc.font("Times-Roman").text(": ", { continued: true });
-        doc.font("Times-Bold").text(toUpperDisplay(b.value));
-        borderY = doc.y;
+        doc.font("Times-Roman").text(b.label, borderLabelX, borderY, { width: borderLabelWidth });
+        doc.font("Times-Roman").text(":", borderColonX, borderY);
+        doc.font("Times-Bold").text(toUpperDisplay(b.value), borderValueX, borderY, {
+          width: bodyWidth - (borderValueX - leftMargin),
+        });
+        borderY = doc.y + 1;
       });
 
       const qrX = 462;

@@ -49,6 +49,16 @@ const canManageUserRole = (actorRoleName, targetRoleName) => {
   return false;
 };
 
+const canManageCertificateLimit = (actorRoleName) => {
+  const actorGroup = getRoleGroup(actorRoleName);
+
+  if (!actorGroup) {
+    return false;
+  }
+
+  return [1, 2].includes(actorGroup);
+};
+
 module.exports = {
   ROLE_GROUPS,
   MODULE_ACCESS_BY_GROUP,
@@ -57,4 +67,5 @@ module.exports = {
   getAllowedModuleKeys,
   canAccessModule,
   canManageUserRole,
+  canManageCertificateLimit,
 };
