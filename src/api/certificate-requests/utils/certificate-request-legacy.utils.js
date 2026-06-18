@@ -111,6 +111,10 @@ const normalizeAttachmentLabel = (value) => {
     return "ConstanciaAdjudicacion";
   }
 
+  if (normalized.includes("testimonio")) {
+    return "Testimonio";
+  }
+
   if (normalized.includes("celular")) {
     return "Celular";
   }
