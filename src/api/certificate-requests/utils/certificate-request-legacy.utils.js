@@ -107,6 +107,10 @@ const normalizeAttachmentLabel = (value) => {
     return "CopiaPlanoMemoria";
   }
 
+  if (normalized.includes("constancia") && normalized.includes("adjudicacion")) {
+    return "ConstanciaAdjudicacion";
+  }
+
   if (normalized.includes("celular")) {
     return "Celular";
   }

@@ -5,16 +5,29 @@ const { requireModuleAccess } = require("../../../middlewares/module-access.midd
 
 const router = express.Router();
 
-router.use(authRequired, requireModuleAccess("certificates"));
+const requireCertificatesReadAccess = requireModuleAccess("certificates", { readOnlyGroups: [4] });
+const requireCertificatesWriteAccess = requireModuleAccess("certificates");
+const requireCertificateStatusUpdateAccess = (req, res, next) => {
+  if (req.user?.roleGroup === 4) {
+    const bodyKeys = Object.keys(req.body || {});
+    if (bodyKeys.length === 1 && bodyKeys.includes("status")) {
+      return next();
+    }
+  }
 
-router.get("/", certificatesController.listCertificates);
-router.get("/download/:filename", certificatesController.downloadCertificatePdfByFilename);
-router.get("/by-number/:number", certificatesController.lookupCertificateByNumber);
-router.get("/:id/delete-preview", certificatesController.previewDeleteCertificate);
-router.get("/:id", certificatesController.getCertificateById);
-router.get("/:id/pdf", certificatesController.downloadCertificatePdf);
-router.post("/", certificatesController.createCertificate);
-router.put("/:id", certificatesController.updateCertificate);
-router.delete("/:id", certificatesController.deleteCertificate);
+  return requireCertificatesWriteAccess(req, res, next);
+};
+
+router.use(authRequired);
+
+router.get("/", requireCertificatesReadAccess, certificatesController.listCertificates);
+router.get("/download/:filename", requireCertificatesReadAccess, certificatesController.downloadCertificatePdfByFilename);
+router.get("/by-number/:number", requireCertificatesReadAccess, certificatesController.lookupCertificateByNumber);
+router.get("/:id/delete-preview", requireCertificatesReadAccess, certificatesController.previewDeleteCertificate);
+router.get("/:id", requireCertificatesReadAccess, certificatesController.getCertificateById);
+router.get("/:id/pdf", requireCertificatesReadAccess, certificatesController.downloadCertificatePdf);
+router.post("/", requireCertificatesWriteAccess, certificatesController.createCertificate);
+router.put("/:id", requireCertificateStatusUpdateAccess, certificatesController.updateCertificate);
+router.delete("/:id", requireCertificatesWriteAccess, certificatesController.deleteCertificate);
 
 module.exports = router;

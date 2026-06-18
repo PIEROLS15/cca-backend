@@ -169,6 +169,10 @@ function resolveRequestNumberForCertificate(input, lookup) {
 
   const clientDoc = input.clientDocumentNumber;
 
+  if (!requestNumberRaw) {
+    return { requestNumber: "", certificateRequestId: null };
+  }
+
   if (requestNumberRaw && lookup.requestByNumber.has(requestNumberRaw)) {
     const match = lookup.requestByNumber.get(requestNumberRaw);
     const matchClientDoc = match.client?.documentNumber;
@@ -187,19 +191,6 @@ function resolveRequestNumberForCertificate(input, lookup) {
         return { requestNumber: normalizedMatch.requestNumber, certificateRequestId: normalizedMatch.id };
       }
       return { requestNumber: normalizedRequestNumber || "", certificateRequestId: null };
-    }
-  }
-
-  const candidateId = resolveCertificateRequestId(input, lookup);
-  const candidates = lookup.requestsByClientDoc.get(clientDoc) || [];
-  if (!candidates.length) {
-    return { requestNumber: normalizedRequestNumber || "", certificateRequestId: null };
-  }
-
-  if (candidateId) {
-    const matched = candidates.find((c) => c.id === candidateId);
-    if (matched) {
-      return { requestNumber: matched.requestNumber, certificateRequestId: matched.id };
     }
   }
 

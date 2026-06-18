@@ -1,3 +1,4 @@
+const { Prisma } = require("@prisma/client");
 const prisma = require("../../../config/prisma");
 const HttpError = require("../../../utils/http-error");
 const { buildPaginationResult, getPaginationParams } = require("../../../utils/pagination");
@@ -16,13 +17,74 @@ const requestIncludes = {
   partner: { include: { commoner: true } },
 };
 
-const nextRequestNumber = async () => {
-  const lastRequest = await prisma.certificateRequest.findFirst({
-    orderBy: { id: "desc" },
-    select: { id: true },
+const REQUEST_NUMBER_COUNTER_KEY = "certificate-request";
+const MAX_REQUEST_NUMBER_RETRIES = 3;
+
+const isRequestNumberRaceError = (error) => {
+  if (error?.code === "P2034") {
+    return true;
+  }
+
+  return error?.code === "P2002"
+    && Array.isArray(error?.meta?.target)
+    && (error.meta.target.includes("requestNumber") || error.meta.target.includes("key"));
+};
+
+const runRequestNumberWriteTransaction = async (handler) => {
+  let attempt = 0;
+
+  while (attempt < MAX_REQUEST_NUMBER_RETRIES) {
+    try {
+      return await prisma.$transaction(
+        async (tx) => handler(tx),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      attempt += 1;
+
+      if (!isRequestNumberRaceError(error) || attempt >= MAX_REQUEST_NUMBER_RETRIES) {
+        throw error;
+      }
+    }
+  }
+};
+
+const reserveNextRequestNumber = async (tx) => {
+  await tx.requestNumberCounter.upsert({
+    where: { key: REQUEST_NUMBER_COUNTER_KEY },
+    create: { key: REQUEST_NUMBER_COUNTER_KEY, value: 0 },
+    update: {},
   });
 
-  const nextSequence = (lastRequest?.id || 0) + 1;
+  const latestRows = await tx.$queryRaw`
+    SELECT COALESCE(
+      MAX(
+        NULLIF(
+          regexp_replace(split_part("requestNumber", '-', 1), '[^0-9]', '', 'g'),
+          ''
+        )::integer
+      ),
+      0
+    ) AS "latestSequence"
+    FROM "CertificateRequest"
+  `;
+
+  const latestSequence = Number(latestRows?.[0]?.latestSequence || 0);
+
+  const reservedRows = await tx.$queryRaw`
+    UPDATE "RequestNumberCounter"
+    SET "value" = GREATEST("value", ${latestSequence}) + 1,
+        "updatedAt" = CURRENT_TIMESTAMP
+    WHERE "key" = ${REQUEST_NUMBER_COUNTER_KEY}
+    RETURNING "value"
+  `;
+
+  const nextSequence = Number(reservedRows?.[0]?.value);
+
+  if (!Number.isInteger(nextSequence) || nextSequence <= 0) {
+    throw new Error("No se pudo reservar el siguiente correlativo de solicitud");
+  }
+
   return buildRequestNumber(nextSequence);
 };
 
@@ -136,7 +198,6 @@ const createCertificateRequest = async (payload, userId) => {
     throw new HttpError(401, "El usuario autenticado no existe o ya no esta disponible");
   }
 
-  const requestNumber = await nextRequestNumber();
   const isComunero = typeof payload.isComunero === "boolean" ? payload.isComunero : true;
 
   const client = await clientsService.upsertClientByDocument(documentNumber, {
@@ -164,24 +225,28 @@ const createCertificateRequest = async (payload, userId) => {
     }
   }
 
-  const request = await prisma.certificateRequest.create({
-    data: {
-      requestNumber,
-      clientId: client.id,
-      userId: creator?.id || null,
-      partnerId,
-      description: payload.requestDescription || null,
-      destination: payload.destination || null,
-      requestDescription: payload.requestDescription || null,
-      sectorLocation: payload.sectorLocation || null,
-      certificateTypes: normalizeCertificateTypes(payload.certificateTypes || []),
-      exposure: payload.exposure || null,
-      attachments: normalizeAttachments(payload.attachments || []),
-    },
-    include: requestIncludes,
-  });
+  return runRequestNumberWriteTransaction(async (tx) => {
+    const requestNumber = await reserveNextRequestNumber(tx);
 
-  return formatCertificateRequestResponse(request);
+    const request = await tx.certificateRequest.create({
+      data: {
+        requestNumber,
+        clientId: client.id,
+        userId: creator?.id || null,
+        partnerId,
+        description: payload.requestDescription || null,
+        destination: payload.destination || null,
+        requestDescription: payload.requestDescription || null,
+        sectorLocation: payload.sectorLocation || null,
+        certificateTypes: normalizeCertificateTypes(payload.certificateTypes || []),
+        exposure: payload.exposure || null,
+        attachments: normalizeAttachments(payload.attachments || []),
+      },
+      include: requestIncludes,
+    });
+
+    return formatCertificateRequestResponse(request);
+  });
 };
 
 const updateCertificateRequest = async (id, payload) => {
