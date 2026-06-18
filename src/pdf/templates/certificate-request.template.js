@@ -102,6 +102,7 @@ const buildCertificateRequestTemplatePdf = async (request) => {
   const contractAttachment = isSelectedAttachment(attachments, ["CompraVenta", "ContratoCompraVentaNotariado", "ContratoDeCompraVentaNotariado"]);
   const planoAttachment = isSelectedAttachment(attachments, ["CopiaPlanoMemoria", "PlanoMemoria", "CopiaDePlanoYMemoria"]);
   const constanciaAdjudicacionAttachment = isSelectedAttachment(attachments, ["ConstanciaAdjudicacion", "ConstanciaDeAdjudicacion"]);
+  const testimonioAttachment = isSelectedAttachment(attachments, ["Testimonio", "TestimonioDeAdjudicacion", "Testimonio de adjudicacion"]);
   const cellAttachment = attachments.find((item) => normalizeToken(item.type) === normalizeToken("Celular"));
 
   return new Promise((resolve, reject) => {
@@ -219,6 +220,7 @@ const buildCertificateRequestTemplatePdf = async (request) => {
       drawAttachmentLine(doc, mark(contractAttachment), "Contrato de compra-venta notariado");
       drawAttachmentLine(doc, mark(planoAttachment), "Copia de plano y memoria");
       drawAttachmentLine(doc, mark(constanciaAdjudicacionAttachment), "Constancia de adjudicación");
+      drawAttachmentLine(doc, mark(testimonioAttachment), "Testimonio");
       drawAttachmentLine(doc, mark(Boolean(cellAttachment)), `Celular Nro. ${toUpperDisplay(cellAttachment?.phoneNumber)}`);
 
       doc.moveDown(0.8);
