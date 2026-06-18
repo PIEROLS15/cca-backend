@@ -151,6 +151,8 @@ const buildCertificateFilters = (query) => {
       {
         OR: [
           { certificateNumber: { contains: s, mode: "insensitive" } },
+          { requestNumber: { contains: s, mode: "insensitive" } },
+          { certificateRequest: { requestNumber: { contains: s, mode: "insensitive" } } },
           { client: clientSearch },
           { partner: clientSearch },
           { owners: { some: { client: clientSearch } } },

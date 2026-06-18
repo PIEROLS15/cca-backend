@@ -9,6 +9,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "node prisma/seed/index.js",
+    "prisma:assign-certificate-ranges": "node prisma/seed/assign-certificate-ranges.js",
     "prisma:studio": "prisma studio"
   },
   "keywords": [],

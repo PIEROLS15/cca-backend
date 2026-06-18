@@ -6,7 +6,7 @@ const { buildRequestLookup, resolveRequestNumberForCertificate } = require("./ce
 const { collectLegacyOwnerCandidates, buildCertificateOwnerRecords } = require("./certificate-owners");
 const { buildCertificateVerificationSnapshot } = require("../../src/api/certificates/utils/certificate-verification.utils");
 
-const ROLES_TO_TRY = ["presidente", "superadmin", "secretaria", "admin", "asistente"];
+const ROLES_TO_TRY = ["secretaria", "presidente", "superadmin"];
 
 const SECTOR_ALIASES = {
   "9 de octubre - casuarinas": "nueve de octubre - las casuarinas",
@@ -73,7 +73,7 @@ async function collectAllCertificates() {
   const all = [];
 
   async function addFromRol(rol) {
-    const baseUrl = `${API_URL}?limit=${PAGE_LIMIT}${rol ? `&rol=${rol}` : ""}`;
+    const baseUrl = `${API_URL}?limit=${PAGE_LIMIT}&rol=${encodeURIComponent(rol)}`;
     let docs;
     try {
       docs = await fetchAllPages(baseUrl);
@@ -95,7 +95,6 @@ async function collectAllCertificates() {
     }
   }
 
-  await addFromRol("");
   for (const rol of ROLES_TO_TRY) {
     await addFromRol(rol);
   }

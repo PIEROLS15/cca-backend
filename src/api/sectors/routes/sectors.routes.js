@@ -5,13 +5,16 @@ const { requireModuleAccess } = require("../../../middlewares/module-access.midd
 
 const router = express.Router();
 
-router.use(authRequired, requireModuleAccess("sectors"));
+const requireSectorsReadAccess = requireModuleAccess("sectors", { readOnlyGroups: [4] });
+const requireSectorsWriteAccess = requireModuleAccess("sectors");
 
-router.get("/", sectorsController.listSectors);
-router.get("/:id/delete-preview", sectorsController.previewDeleteSector);
-router.get("/:id", sectorsController.getSectorById);
-router.post("/", sectorsController.createSector);
-router.put("/:id", sectorsController.updateSector);
-router.delete("/:id", sectorsController.deleteSector);
+router.use(authRequired);
+
+router.get("/", requireSectorsReadAccess, sectorsController.listSectors);
+router.get("/:id/delete-preview", requireSectorsReadAccess, sectorsController.previewDeleteSector);
+router.get("/:id", requireSectorsReadAccess, sectorsController.getSectorById);
+router.post("/", requireSectorsWriteAccess, sectorsController.createSector);
+router.put("/:id", requireSectorsWriteAccess, sectorsController.updateSector);
+router.delete("/:id", requireSectorsWriteAccess, sectorsController.deleteSector);
 
 module.exports = router;
