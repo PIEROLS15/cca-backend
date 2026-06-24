@@ -138,7 +138,7 @@ const buildCertificateRequestTemplatePdf = async (request) => {
       });
 
       doc.y = 156;
-      doc.font("Times-Roman").fontSize(12).text("SOLICITO, TRASPASO", 52, doc.y, { lineGap: 0 });
+      doc.font("Times-Roman").fontSize(12).text(`SOLICITO, ${toUpperDisplay(request.requestDescription || request.description || "")}`, 52, doc.y, { lineGap: 0 });
       doc.moveDown(0.55);
 
       const optionsY = doc.y;
@@ -182,7 +182,7 @@ const buildCertificateRequestTemplatePdf = async (request) => {
       doc.text("Ante usted me presento y expongo:", 52, doc.y, { width: 492, lineGap: 0 });
       doc.moveDown(0.08);
 
-      doc.font("Times-Roman").text(toUpperDisplay(request.exposure || request.requestDescription || ""), 52, doc.y, {
+      doc.font("Times-Roman").text(toUpperDisplay(request.exposure || ""), 52, doc.y, {
         width: 470,
         align: "left",
         lineGap: 0,
