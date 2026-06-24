@@ -25,6 +25,102 @@ const toQrBuffer = (value) =>
     );
   });
 
+const hasValue = (value) => value !== null && value !== undefined && value !== "";
+
+const formatTwoDecimals = (value) => (hasValue(value) ? Number(value).toFixed(2) : "");
+
+const buildPossessionSegments = (certificate) => {
+  const terrain = certificate.terrain || {};
+  const terrainTypeName = toUpperDisplay(terrain.terrainType?.name || "");
+  const measurementMode = terrain.measurementModeUsed || "RECTANGULAR_AUTO";
+
+  const width = formatTwoDecimals(terrain.width);
+  const length = formatTwoDecimals(terrain.length);
+  const totalArea = formatTwoDecimals(terrain.totalArea);
+  const area = formatTwoDecimals(terrain.area);
+  const perimeter = formatTwoDecimals(terrain.perimeter);
+  const additionalWidth = formatTwoDecimals(terrain.additionalWidth);
+  const additionalLength = formatTwoDecimals(terrain.additionalLength);
+  const hasAdditionalMeasure = Boolean(additionalWidth && additionalLength);
+  const segments = [];
+
+  segments.push({ text: "ES POSESIONARIO DE UN TERRENO DE ", bold: false });
+  if (terrainTypeName) segments.push({ text: terrainTypeName, bold: true });
+
+  if (measurementMode === "AREA_PERIMETER") {
+    if (perimeter) {
+      segments.push({ text: " DE PERÍMETRO ", bold: false });
+      segments.push({ text: `${perimeter} ML`, bold: true });
+    }
+    if (area) {
+      segments.push({ text: " Y ÁREA ", bold: false });
+      segments.push({ text: `${area} M²`, bold: true });
+    }
+    if (hasAdditionalMeasure) {
+      segments.push({ text: ". MÁS UNA MEDIDA ADICIONAL DE ", bold: false });
+      segments.push({ text: `${additionalWidth} X ${additionalLength} METROS`, bold: true });
+    }
+    segments.push({ text: ".", bold: false });
+    return segments;
+  }
+
+  if (measurementMode === "MANUAL_TOTAL_AREA") {
+    if (totalArea) {
+      segments.push({ text: " DE ÁREA TOTAL ", bold: false });
+      segments.push({ text: `${totalArea} M²`, bold: true });
+    }
+    if (hasAdditionalMeasure) {
+      segments.push({ text: ". MÁS UNA MEDIDA ADICIONAL DE ", bold: false });
+      segments.push({ text: `${additionalWidth} X ${additionalLength} METROS`, bold: true });
+    }
+    segments.push({ text: ".", bold: false });
+    return segments;
+  }
+
+  if (width && length) {
+    segments.push({ text: " DE ", bold: false });
+    segments.push({ text: `${width} X ${length} METROS`, bold: true });
+  }
+  if (hasAdditionalMeasure) {
+    segments.push({ text: ", MÁS UNA MEDIDA ADICIONAL DE ", bold: false });
+    segments.push({ text: `${additionalWidth} X ${additionalLength} METROS`, bold: true });
+    if (totalArea) {
+      segments.push({ text: ".", bold: false });
+      segments.push({ text: " DE UN ÁREA TOTAL DE ", bold: false });
+      segments.push({ text: `${totalArea} M²`, bold: true });
+      segments.push({ text: ".", bold: false });
+      return segments;
+    }
+
+    segments.push({ text: ".", bold: false });
+    return segments;
+  }
+  if (totalArea) {
+    segments.push({ text: ". DE UN ÁREA TOTAL DE ", bold: false });
+    segments.push({ text: `${totalArea} M²`, bold: true });
+  }
+
+  segments.push({ text: ".", bold: false });
+
+  return segments;
+};
+
+const renderTextSegments = (doc, segments, x, y, options = {}) => {
+  segments.forEach((segment, index) => {
+    const textOptions = {
+      ...options,
+      continued: index < segments.length - 1,
+    };
+
+    if (index === 0) {
+      doc.font(segment.bold ? "Times-Bold" : "Times-Roman").text(segment.text, x, y, textOptions);
+      return;
+    }
+
+    doc.font(segment.bold ? "Times-Bold" : "Times-Roman").text(segment.text, textOptions);
+  });
+};
+
 const drawCodeGrid = (doc, code) => {
   const fontSize = 15;
   const baseX = 50;
@@ -67,13 +163,6 @@ const buildCertificatePdf = async (certificate) => {
       const owners = certificate.owners || [];
       const ownerNames = owners.map((o) => toUpperDisplay(o.fullName)).join(" Y ");
       const ownerDocs = owners.map((o) => toUpperDisplay(o.documentNumber)).join(" Y ");
-      const w = certificate.terrain?.width;
-      const l = certificate.terrain?.length;
-      const a = certificate.terrain?.totalArea;
-      const medidas = w != null && l != null
-        ? `${Number(w).toFixed(2)}  X  ${Number(l).toFixed(2)} METROS`
-        : "";
-      const area = a != null ? `${Number(a).toFixed(2)}` : "";
       const dateStr = toDisplayDate(certificate.createdAt);
       const code = certificate.certificateNumber || "";
       const qrValue = buildCertificateVerificationUrl(certificate.verificationToken || certificate.certificateNumber || code);
@@ -111,30 +200,10 @@ const buildCertificatePdf = async (certificate) => {
       doc.restore();
 
       let curY = green2Y + 20;
-      const posLine1 = "ES POSESIONARIO DE UN TERRENO DE ";
-      const posLine2 = "VIVIENDA";
-      const posLine3 = " DE ";
-      const posLine4 = medidas || "";
-      const posLine5 = ". DE UN ÁREA TOTAL DE ";
-      const posLine6 = area ? `${area} M` : "";
+      const possessionSegments = buildPossessionSegments(certificate);
 
       doc.font("Times-Roman").fontSize(12);
-      doc.text(posLine1, leftMargin, curY, { continued: true, width: bodyWidth });
-      doc.font("Times-Bold").text(posLine2, { continued: true, width: bodyWidth });
-      doc.font("Times-Roman").text(posLine3, { continued: true, width: bodyWidth });
-      if (posLine4) {
-        doc.font("Times-Bold").text(posLine4, { continued: true, width: bodyWidth });
-      }
-      doc.font("Times-Roman").text(posLine5, { continued: true, width: bodyWidth });
-      if (area) {
-        doc.font("Times-Bold").text(posLine6, { continued: true, width: bodyWidth });
-        const supX = doc.x;
-        const supY = doc.y;
-        doc.font("Times-Bold").fontSize(8).text("2", supX, supY - 3, { continued: true, width: bodyWidth });
-        doc.font("Times-Bold").fontSize(12).text(".", { continued: false, width: bodyWidth });
-      } else {
-        doc.font("Times-Roman").text(".", { continued: false, width: bodyWidth });
-      }
+      renderTextSegments(doc, possessionSegments, leftMargin, curY, { width: bodyWidth, lineGap: 0 });
 
       curY = doc.y + 8;
       doc.font("Times-Roman").fontSize(12);
