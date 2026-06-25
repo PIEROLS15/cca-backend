@@ -4,7 +4,6 @@ const prisma = require("../../../config/prisma");
 const HttpError = require("../../../utils/http-error");
 const { buildPaginationResult, getPaginationParams } = require("../../../utils/pagination");
 const { formatCertificateSequence } = require("../../../utils/certificate-range.utils");
-const reniecService = require("../../clients/services/reniec.service");
 const {
   normalizeCertificateStatus,
   normalizeTerrainMeasurementMode,
@@ -131,22 +130,21 @@ const resolveOwnerClients = async (tx, owners = []) => {
   const seen = new Set();
 
   for (const owner of ownerEntries) {
-    let client = null;
     const documentNumber = normalizeDocumentNumber(owner.documentNumber);
+    const fullName = String(owner.fullName || "").trim();
 
     if (!documentNumber) {
       throw new HttpError(400, "Cada dueño debe tener DNI");
     }
 
-    const reniec = await reniecService.searchByDocument(documentNumber);
-    const reniecFullName = String(reniec.fullName || "").trim();
-
-    if (!client && documentNumber) {
-      client = await tx.client.findUnique({
-        where: { documentNumber },
-        select: { id: true, fullName: true, documentNumber: true },
-      });
+    if (!fullName) {
+      throw new HttpError(400, "Cada dueño debe tener nombres y DNI");
     }
+
+    let client = await tx.client.findUnique({
+      where: { documentNumber },
+      select: { id: true, fullName: true, documentNumber: true },
+    });
 
     if (!client && owner.id) {
       client = await tx.client.findUnique({
@@ -156,29 +154,17 @@ const resolveOwnerClients = async (tx, owners = []) => {
     }
 
     if (client) {
-      const updateData = {};
-
-      if (reniecFullName && normalizeComparableName(client.fullName) !== normalizeComparableName(reniecFullName)) {
-        updateData.fullName = reniecFullName;
-      }
-
-      if (Object.keys(updateData).length > 0) {
+      if (normalizeComparableName(client.fullName) !== normalizeComparableName(fullName)) {
         client = await tx.client.update({
           where: { id: client.id },
-          data: updateData,
+          data: { fullName },
           select: { id: true, fullName: true, documentNumber: true },
         });
       }
-    }
-
-    if (!client) {
-      if (!reniecFullName) {
-        throw new HttpError(404, `No se encontraron datos para el DNI ${documentNumber}`);
-      }
-
+    } else {
       client = await tx.client.create({
         data: {
-          fullName: reniecFullName,
+          fullName,
           documentNumber,
           address: null,
           phone: null,
