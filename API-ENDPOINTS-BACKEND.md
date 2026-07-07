@@ -1,146 +1,30 @@
-# API Backend - Guia de pruebas endpoint por endpoint
+# API Backend
 
-Este documento lista los endpoints del backend para probarlos uno por uno.
-
-## Base URL
-
+## Base
 - Local: `http://localhost:9001`
-- Health check: `GET /health`
-- Prefijo API: `/api`
+- Prefix: `/api`
+- Health: `GET /health`
 
-## Autenticacion
-
-Todos los endpoints (excepto `/health` y `/api/auth/login`) requieren autenticacion.
-El token JWT se genera via `POST /api/auth/login` y se almacena automaticamente en una cookie httpOnly (`token`).
-El endpoint de login no devuelve el token en el JSON de respuesta.
-
-Alternativamente, se puede usar el header:
-
-- `Authorization: Bearer <token>`
-
-## Formato de respuesta paginada
-
-Todos los endpoints de listado (`GET`) ahora son paginados.
-
-Query params comunes:
-
-- `page` (default: `1`)
-- `limit` (default: `10`, maximo: `100`)
-
-Respuesta:
-
-```json
-{
-  "message": "Usuarios encontrados correctamente",
-  "error": false,
-  "status": 200,
-  "data": [],
-  "total": 2,
-  "limit": 10,
-  "totalPages": 1,
-  "page": 1,
-  "pagingCounter": 1,
-  "hasPrevPage": false,
-  "hasNextPage": false,
-  "prevPage": null,
-  "nextPage": null
-}
-```
-
-## 1) Auth (no requiere rol especifico)
+## Auth
+Todos los endpoints, salvo `/health` y `/api/auth/login`, requieren autenticacion.
+El login crea una cookie httpOnly `token` y tambien puedes usar `Authorization: Bearer <token>`.
 
 ### POST `/api/auth/login`
+Inicia sesion y devuelve el usuario autenticado.
 
 Body:
-
 ```json
-{
-  "username": "admin",
-  "password": "123456"
-}
+{ "username": "pierols", "password": "123456" }
 ```
 
-Respuesta: setea una cookie httpOnly `token` con el JWT. Devuelve solo los datos del usuario:
-
-```json
-{
-  "user": {
-    "id": 1,
-    "username": "admin",
-    "fullName": "Admin",
-    "email": "admin@correo.com",
-    "dni": "00000258",
-    "isActive": true,
-    "role": {
-      "id": 1,
-      "name": "Admin",
-      "description": "Acceso total al sistema",
-      "permissions": []
-    },
-    "createdAt": "2026-05-18T23:55:52.452Z",
-    "updatedAt": "2026-05-18T23:55:52.452Z"
-  }
-}
-```
-
-### POST `/api/auth/logout`
-
-Requiere autenticacion (token en cookie o Authorization header). Limpia la cookie `token`.
-
-```json
-{
-  "message": "Sesión cerrada correctamente"
-}
-```
-
-### GET `/api/auth/me`
-
-Requiere autenticacion. Valida el token JWT y devuelve los datos del usuario autenticado. Util para verificar si la sesion sigue activa desde el frontend.
-
-```json
-{
-  "user": {
-    "id": 1,
-    "username": "admin",
-    "fullName": "Admin",
-    "email": "admin@correo.com",
-    "dni": "00000258",
-    "isActive": true,
-    "role": {
-      "id": 1,
-      "name": "Admin",
-      "description": "Acceso total al sistema",
-      "permissions": []
-    },
-    "createdAt": "2026-05-18T23:55:52.452Z",
-    "updatedAt": "2026-05-18T23:55:52.452Z"
-  }
-}
-```
-
-### PATCH `/api/auth/profile`
-
-Requiere autenticacion. Actualiza los datos personales del usuario autenticado.
-
-Body:
-
-```json
-{
-  "fullName": "Piero Llanos Sanchez",
-  "username": "pierols",
-  "email": "piero@correo.com"
-}
-```
-
-Respuesta:
-
+Response:
 ```json
 {
   "user": {
     "id": 1,
     "username": "pierols",
     "fullName": "Piero Llanos Sanchez",
-    "email": "piero@correo.com",
+    "email": "piero@gmail.com",
     "dni": "73171545",
     "isActive": true,
     "role": {
@@ -155,107 +39,203 @@ Respuesta:
 }
 ```
 
-### POST `/api/auth/change-password`
+### POST `/api/auth/logout`
+Cierra la sesion actual.
 
-Requiere autenticacion. Cambia la contraseña del usuario autenticado. Requiere verificar la contraseña actual.
+### GET `/api/auth/me`
+Devuelve el usuario autenticado actual.
 
-Body:
-
+Response:
 ```json
 {
-  "currentPassword": "123456",
-  "newPassword": "nueva-clave-segura"
+  "user": {
+    "id": 1,
+    "username": "pierols",
+    "fullName": "Piero Llanos Sanchez",
+    "email": "piero@gmail.com",
+    "dni": "73171545",
+    "isActive": true,
+    "role": {
+      "id": 1,
+      "name": "Admin",
+      "description": "Acceso total al sistema",
+      "permissions": []
+    },
+    "createdAt": "2026-05-18T23:55:52.452Z",
+    "updatedAt": "2026-05-18T23:55:52.452Z"
+  }
 }
 ```
 
-Respuesta:
+### PATCH `/api/auth/profile`
+Actualiza el perfil del usuario autenticado.
 
+Body:
 ```json
-{
-  "message": "Contraseña actualizada correctamente"
-}
+{ "fullName": "Nombre Completo", "username": "usuario", "email": "correo@dominio.com" }
+```
+
+### POST `/api/auth/change-password`
+Cambia la clave del usuario autenticado.
+
+Body:
+```json
+{ "currentPassword": "123456", "newPassword": "nueva-clave" }
 ```
 
 ### POST `/api/auth/verify-password`
-
-Requiere autenticacion. Verifica que la contraseña actual sea correcta (util para el flujo de cambio de contraseña en dos pasos desde el frontend).
+Verifica la clave actual antes de cambiarla.
 
 Body:
-
 ```json
-{
-  "password": "123456"
-}
+{ "password": "123456" }
 ```
+
+## Pagination
+Los listados usan paginacion.
+
+Query comunes:
+- `page` default `1`
+- `limit` default `10`, maximo `100`
 
 Respuesta:
-
 ```json
 {
-  "message": "Contraseña verificada correctamente"
+  "message": "...",
+  "error": false,
+  "status": 200,
+  "data": [],
+  "total": 0,
+  "limit": 10,
+  "totalPages": 1,
+  "page": 1,
+  "pagingCounter": 1,
+  "hasPrevPage": false,
+  "hasNextPage": false,
+  "prevPage": null,
+  "nextPage": null
 }
 ```
 
-## 2) Roles (requiere rol `Admin`)
+## Roles
+Ruta base: `/api/roles`
 
-### GET `/api/roles?page=1&limit=10`
+### GET `/api/roles`
+Lista roles con permisos.
 
-Query params: `page`, `limit`, cualquier otro se pasa al servicio.
-
-### GET `/api/roles/:id`
-
-### POST `/api/roles`
-
+Example response:
 ```json
 {
-  "name": "SECRETARIA",
-  "description": "Rol de secretaria",
-  "permissions": [
+  "message": "Roles encontrados correctamente",
+  "error": false,
+  "status": 200,
+  "data": [
     {
-      "key": "certificates.read",
-      "description": "Leer certificados"
-    },
-    {
-      "key": "certificates.create",
-      "description": "Crear certificados"
+      "id": 1,
+      "name": "Admin",
+      "description": "Acceso total al sistema",
+      "group": 1,
+      "permissions": [],
+      "createdAt": "2026-05-18T23:55:52.452Z",
+      "updatedAt": "2026-05-18T23:55:52.452Z"
     }
+  ],
+  "total": 8,
+  "limit": 10,
+  "totalPages": 1,
+  "page": 1,
+  "pagingCounter": 1,
+  "hasPrevPage": false,
+  "hasNextPage": false,
+  "prevPage": null,
+  "nextPage": null
+}
+```
+
+### GET `/api/roles/:id`
+Devuelve un rol especifico por ID.
+
+### GET `/api/roles/:id/delete-preview`
+Muestra el impacto de borrar un rol.
+
+### POST `/api/roles`
+Crea un nuevo rol con permisos.
+
+Body:
+```json
+{
+  "name": "Secretaria",
+  "description": "Gestion documentaria",
+  "permissions": [
+    { "key": "certificates.read", "description": "Leer certificados" }
   ]
 }
 ```
 
 ### PUT `/api/roles/:id`
+Actualiza un rol existente.
 
+### DELETE `/api/roles/:id`
+Borra un rol si no tiene dependencias.
+
+## Users
+Ruta base: `/api/users`
+
+### GET `/api/users`
+Lista usuarios con paginacion y filtros.
+
+Filtros:
+- `roleId`
+- `isActive`
+- `search`
+
+Example response:
 ```json
 {
-  "name": "SECRETARIA",
-  "description": "Rol actualizado",
-  "permissions": [
-    { "key": "certificates.read" },
-    { "key": "certificates.update" }
-  ]
+  "message": "Usuarios encontrados correctamente",
+  "error": false,
+  "status": 200,
+  "data": [
+    {
+      "id": 1,
+      "username": "pierols",
+      "fullName": "Piero Llanos Sanchez",
+      "email": "piero@gmail.com",
+      "dni": "73171545",
+      "isActive": true,
+      "certificateRangeStart": null,
+      "certificateRangeEnd": null,
+      "lastCertificate": null,
+      "role": {
+        "id": 1,
+        "name": "Admin",
+        "description": "Acceso total al sistema",
+        "group": 1,
+        "permissions": []
+      },
+      "createdAt": "2026-05-18T23:55:52.452Z",
+      "updatedAt": "2026-05-18T23:55:52.452Z"
+    }
+  ],
+  "total": 16,
+  "limit": 10,
+  "totalPages": 2,
+  "page": 1,
+  "pagingCounter": 1,
+  "hasPrevPage": false,
+  "hasNextPage": true,
+  "prevPage": null,
+  "nextPage": 2
 }
 ```
 
-### DELETE `/api/roles/:id`
-
-Respuesta: `{ "message": "...", "error": false, "status": 200, "data": null }`
-
-## 3) Users (requiere rol `Admin` o `Presidente`)
-
-### GET `/api/users?page=1&limit=10`
-
-Filtros opcionales:
-
-- `roleId` (numero)
-- `isActive` (`true` o `false`)
-- cualquier otro se pasa al servicio
-
 ### GET `/api/users/:id`
+Devuelve un usuario por ID.
 
 ### POST `/api/users`
+Crea un usuario nuevo.
 
 Body:
-
 ```json
 {
   "username": "presidente1",
@@ -268,365 +248,454 @@ Body:
 ```
 
 ### PUT `/api/users/:id`
+Actualiza un usuario existente.
 
-Body (ejemplo):
-
-```json
-{
-  "username": "presidente1",
-  "fullName": "Usuario Presidente Actualizado",
-  "email": "presidente1-actualizado@correo.com",
-  "dni": "73171549",
-  "roleId": 2,
-  "password": "nueva-clave"
-}
-```
+Body puede incluir:
+`username`, `password`, `fullName`, `email`, `dni`, `roleId`, `certificateRangeStart`, `certificateRangeEnd`
 
 ### PATCH `/api/users/:id/status`
+Activa o desactiva un usuario.
 
 Body:
-
 ```json
-{
-  "isActive": false
-}
-```
-
-Si `isActive` es `false`, el usuario no puede iniciar sesion en `/api/auth/login`.
-
-Shape esperado del usuario en respuestas:
-
-```json
-{
-  "id": 1,
-  "username": "pierols",
-  "fullName": "Piero Llanos Sanchez",
-  "email": "piero@gmail.com",
-  "dni": "73171545",
-  "isActive": true,
-  "role": {
-    "id": 3,
-    "name": "Admin",
-    "description": "Acceso total al sistema",
-    "permissions": []
-  },
-  "createdAt": "2026-05-18T23:55:52.452Z",
-  "updatedAt": "2026-05-18T23:55:52.452Z"
-}
+{ "isActive": false }
 ```
 
 ### DELETE `/api/users/:id`
+Borra un usuario del sistema.
 
-Respuesta: `204 No Content`
+## Sectors
+Ruta base: `/api/sectors`
 
-## 4) Sectors
+### GET `/api/sectors`
+Lista sectores con paginacion.
 
-### GET `/api/sectors?page=1&limit=10`
-
-### GET `/api/sectors/:id`
-
-### POST `/api/sectors`
-
+Example response:
 ```json
 {
-  "name": "Sector Norte"
+  "message": "Sectores encontrados correctamente",
+  "error": false,
+  "status": 200,
+  "data": [
+    {
+      "id": 1,
+      "name": "SANTA CRUZ DE ASIA",
+      "createdAt": "2026-06-18T03:15:28.000Z",
+      "updatedAt": "2026-06-18T03:15:28.000Z"
+    }
+  ],
+  "total": 72,
+  "limit": 10,
+  "totalPages": 8,
+  "page": 1,
+  "pagingCounter": 1,
+  "hasPrevPage": false,
+  "hasNextPage": true,
+  "prevPage": null,
+  "nextPage": 2
 }
+```
+
+### GET `/api/sectors/:id`
+Devuelve un sector por ID.
+
+### GET `/api/sectors/:id/delete-preview`
+Muestra el impacto de borrar un sector.
+
+### POST `/api/sectors`
+Crea un sector nuevo.
+
+Body:
+```json
+{ "name": "Sector Norte" }
 ```
 
 ### PUT `/api/sectors/:id`
+Actualiza el nombre de un sector.
 
+Body:
 ```json
-{
-  "name": "Sector Norte A"
-}
+{ "name": "Sector Norte A" }
 ```
 
 ### DELETE `/api/sectors/:id`
+Borra un sector si no tiene certificados asociados.
 
-Respuesta: `204 No Content`
+## Terrain Types
+Ruta base: `/api/terrain-types`
 
-## 5) Terrain Types
+### GET `/api/terrain-types`
+Lista tipos de terreno con su configuracion.
 
-### GET `/api/terrain-types?page=1&limit=10`
-
-### GET `/api/terrain-types/:id`
-
-### POST `/api/terrain-types`
-
+Example response:
 ```json
 {
-  "name": "Agricola"
+  "message": "Tipos de terreno encontrados correctamente",
+  "error": false,
+  "status": 200,
+  "data": [
+    {
+      "id": 1,
+      "name": "VIVIENDA",
+      "terrainTypeConfigId": 3,
+      "config": {
+        "id": 3,
+        "key": "RECTANGULAR_WITH_OPTIONS",
+        "label": "Rectangular con opciones",
+        "formMode": "RECTANGULAR_AUTO",
+        "showMzLot": true,
+        "allowAdditionalMeasure": true,
+        "allowAreaPerimeterToggle": true,
+        "createdAt": "2026-06-18T03:15:28.887Z",
+        "updatedAt": "2026-06-18T03:15:28.887Z"
+      },
+      "createdAt": "2026-06-18T03:15:28.887Z",
+      "updatedAt": "2026-06-18T03:15:28.887Z"
+    }
+  ],
+  "total": 13,
+  "limit": 10,
+  "totalPages": 2,
+  "page": 1,
+  "pagingCounter": 1,
+  "hasPrevPage": false,
+  "hasNextPage": true,
+  "prevPage": null,
+  "nextPage": 2
 }
+```
+
+### GET `/api/terrain-types/:id`
+Devuelve un tipo de terreno por ID.
+
+### GET `/api/terrain-types/:id/delete-preview`
+Muestra el impacto de borrar un tipo de terreno.
+
+### POST `/api/terrain-types`
+Crea un nuevo tipo de terreno.
+
+Body:
+```json
+{ "name": "Vivienda" }
 ```
 
 ### PUT `/api/terrain-types/:id`
+Actualiza un tipo de terreno existente.
 
+Body:
 ```json
-{
-  "name": "Residencial"
-}
+{ "name": "Residencial" }
 ```
 
 ### DELETE `/api/terrain-types/:id`
+Borra un tipo de terreno si no tiene certificados asociados.
 
-Respuesta: `204 No Content`
+## Clients
+Ruta base: `/api/clients`
 
-## 6) Clients
+### GET `/api/clients`
+Lista clientes con paginacion y filtros.
 
-### GET `/api/clients?page=1&limit=10`
+Filtros:
+- `clientType=Comunero|Tercero`
+- `search`
+- `documentNumber`
 
-Query opcional adicional:
-
-- `clientType=Comunero`
-- `clientType=Tercero`
-
-Observaciones:
-
-- `nro_licence` se devuelve solo cuando el cliente es `Comunero`
-- el correlativo de `nro_licence` se asigna automaticamente en backend
-- no se envía `nro_licence` en `POST` ni en `PUT`
-
-### GET `/api/clients/search/:document`
-
-Busca un cliente por numero de documento en la base de datos local.
-Requiere al menos 3 caracteres.
-
-### GET `/api/clients/reniec/:document`
-
-Consulta el DNI en la API externa de RENIEC. Requiere exactamente 8 digitos.
-
-### GET `/api/clients/:id`
-
-Ejemplo de respuesta:
-
+Example response:
 ```json
 {
-  "id": 1,
-  "fullName": "Arias Aburto, Olga Lidia",
-  "documentNumber": "80093634",
-  "address": "Asia",
-  "phone": null,
-  "clientType": "Comunero",
-  "nro_licence": "0001",
-  "createdAt": "2026-05-25T23:46:15.722Z",
-  "updatedAt": "2026-05-25T23:46:15.722Z"
+  "message": "Clientes encontrados correctamente",
+  "error": false,
+  "status": 200,
+  "data": [
+    {
+      "id": 1,
+      "fullName": "Arias Aburto, Olga Lidia",
+      "documentNumber": "80093634",
+      "address": "Asia",
+      "phone": null,
+      "clientType": "Comunero",
+      "nro_licence": "0001",
+      "licenseSequence": 1,
+      "createdAt": "2026-05-25T23:46:15.722Z",
+      "updatedAt": "2026-05-25T23:46:15.722Z"
+    }
+  ],
+  "total": 10491,
+  "limit": 10,
+  "totalPages": 1050,
+  "page": 1,
+  "pagingCounter": 1,
+  "hasPrevPage": false,
+  "hasNextPage": true,
+  "prevPage": null,
+  "nextPage": 2
 }
 ```
 
+### GET `/api/clients/search/:document`
+Busca un cliente local por documento.
+
+### GET `/api/clients/reniec/:document`
+Consulta RENIEC para un documento de 8 digitos.
+
+### GET `/api/clients/:id`
+Devuelve un cliente por ID.
+
+### GET `/api/clients/:id/delete-preview`
+Muestra las dependencias del cliente antes de borrarlo.
+
 ### POST `/api/clients`
+Crea un cliente nuevo.
 
-Si `clientType` es `Comunero`, el backend asigna automaticamente el siguiente `nro_licence`.
-Si `clientType` es `Tercero`, `nro_licence` queda `null`.
-
+Body:
 ```json
 {
   "fullName": "Juan Perez",
   "documentNumber": "12345678",
   "address": "Av. Principal 123",
   "phone": "999888777",
-  "clientType": "Comunero"
+  "isComunero": true
 }
 ```
 
 ### PUT `/api/clients/:id`
+Actualiza un cliente existente.
 
-Si un cliente `Tercero` pasa a `Comunero`, el backend asigna automaticamente el siguiente `nro_licence` disponible.
-Si un cliente `Comunero` pasa a `Tercero`, el sistema conserva la secuencia internamente por trazabilidad, pero la respuesta devuelve `nro_licence: null` mientras siga siendo `Tercero`.
+Mismo cuerpo que `POST`.
 
+### DELETE `/api/clients/:id`
+Borra un cliente si no tiene dependencias.
+
+## Certificate Requests
+Ruta base: `/api/certificate-requests`
+
+### GET `/api/certificate-requests`
+Lista solicitudes de certificado con paginacion.
+
+Filtro:
+- `search`
+
+Example response:
 ```json
 {
-  "fullName": "Juan Perez Quispe",
-  "documentNumber": "12345678",
-  "address": "Av. Principal 456",
-  "phone": "999888111",
-  "clientType": "Comunero"
+  "message": "Solicitudes de certificado encontradas correctamente",
+  "error": false,
+  "status": 200,
+  "data": [
+    {
+      "id": 1,
+      "requestNumber": "003223-26",
+      "isComunero": true,
+      "destination": "Ingeniero",
+      "requestDescription": "Solicito emision de certificado.",
+      "sectorLocation": "VILLA DEL MAR - ETAPA II",
+      "client": {
+        "id": 1,
+        "searchType": "Reniec",
+        "fullName": "Arias Aburto, Olga Lidia",
+        "documentNumber": "80093634",
+        "address": "Asia",
+        "nro_licence": "0001"
+      },
+      "partnerClient": {
+        "id": null,
+        "searchType": "",
+        "fullName": "",
+        "documentNumber": "",
+        "address": "",
+        "nro_licence": null
+      },
+      "certificateTypes": [
+        { "type": "CertificadoPosesion" }
+      ],
+      "exposure": "Solicito certificado de posesion.",
+      "attachments": [
+        { "type": "CopiaDni" }
+      ],
+      "createdBy": { "dni": "00000258", "role": "Atencion" },
+      "createdAt": "2026-05-18T20:35:20.000Z",
+      "updatedAt": "2026-05-18T20:35:20.000Z"
+    }
+  ],
+  "total": 3803,
+  "limit": 10,
+  "totalPages": 381,
+  "page": 1,
+  "pagingCounter": 1,
+  "hasPrevPage": false,
+  "hasNextPage": true,
+  "prevPage": null,
+  "nextPage": 2
 }
 ```
 
-### DELETE `/api/clients/:id`
-
-Respuesta: `204 No Content`
-
-## 7) Certificate Requests
-
-### GET `/api/certificate-requests?page=1&limit=10`
-
 ### GET `/api/certificate-requests/download/:filename`
-
-Descarga el PDF por nombre de archivo (ej: `solicitud-certificado-003223-26.pdf`). El PDF se sirve inline.
+Descarga el PDF de una solicitud.
 
 ### GET `/api/certificate-requests/:id`
+Devuelve una solicitud por ID o numero.
 
-Acepta tanto el `id` numerico como el `requestNumber` (ej: `000001` o `000001-26`).
+### GET `/api/certificate-requests/:id/delete-preview`
+Muestra el impacto de borrar la solicitud.
 
 ### POST `/api/certificate-requests`
+Crea una nueva solicitud de certificado.
 
-El cliente titular se toma desde el objeto `client` del body.
-Si se envia `partnerClient` con datos, se registra como partner y se almacena su `partnerId`.
-`isComunero` determina el `clientType`: `true` -> `Comunero`, `false` -> `Tercero`.
-El campo `createdBy` se completa automaticamente con el usuario autenticado que realiza el registro.
-Si `isComunero=true`, el backend asigna automaticamente `nro_licence` al cliente si todavia no tiene uno.
-La misma regla aplica cuando el cliente se crea o actualiza indirectamente desde solicitudes.
-
+Body:
 ```json
 {
   "isComunero": true,
   "destination": "Ingeniero",
-  "requestDescription": "Solicito emision de certificado para tramite de posesion.",
-  "sectorLocation": "Las Lomas Santa Rosa De Asia Mz:A1 Lt:4",
+  "requestDescription": "Solicito emision de certificado.",
+  "sectorLocation": "VILLA DEL MAR - ETAPA II",
   "client": {
-    "searchType": "Reniec",
     "fullName": "Arias Aburto, Olga Lidia",
     "documentNumber": "80093634",
-    "address": "Asia",
-    "nro_licence": "0001"
+    "address": "Asia"
   },
   "partnerClient": {
-    "searchType": "Comunidad",
     "fullName": "",
     "documentNumber": "",
-    "address": "",
-    "nro_licence": null
+    "address": ""
   },
   "certificateTypes": [
-    {
-      "type": "CertificadoPosesion"
-    },
-    {
-      "type": "Otros",
-      "otherType": "Constancia de residencia"
-    }
+    { "type": "CertificadoPosesion" }
   ],
   "exposure": "Solicito certificado de posesion.",
   "attachments": [
-    {
-      "type": "CopiaDni"
-    },
-    {
-      "type": "CopiaPlanoMemoria"
-    },
-    {
-      "type": "Celular",
-      "phoneNumber": "980215312"
-    }
+    { "type": "CopiaDni" }
   ]
 }
 ```
 
 ### PUT `/api/certificate-requests/:id`
-
-```json
-{
-  "destination": "Notaria",
-  "requestDescription": "Solicitud revisada",
-  "status": "Aprobada"
-}
-```
-
-Estructura de respuesta de `GET /api/certificate-requests/:id`:
-
-```json
-{
-  "id": 1,
-  "requestNumber": "003223-26",
-  "isComunero": true,
-  "destination": "Ingeniero",
-  "requestDescription": "Solicito emision de certificado para tramite de posesion.",
-  "sectorLocation": "Las Lomas Santa Rosa De Asia Mz:A1 Lt:4",
-  "client": {
-    "searchType": "Reniec",
-    "fullName": "Arias Aburto, Olga Lidia",
-    "documentNumber": "80093634",
-    "address": "Asia",
-    "nro_licence": "0001"
-  },
-  "partnerClient": {
-    "searchType": "Comunidad",
-    "fullName": "",
-    "documentNumber": "",
-    "address": "",
-    "nro_licence": null
-  },
-  "certificateTypes": [
-    {
-      "type": "CertificadoPosesion"
-    },
-    {
-      "type": "Otros",
-      "otherType": "Constancia de residencia"
-    }
-  ],
-  "exposure": "Solicito certificado de posesion.",
-  "attachments": [
-    {
-      "type": "CopiaDni"
-    },
-    {
-      "type": "CopiaPlanoMemoria"
-    },
-    {
-      "type": "Celular",
-      "phoneNumber": "980215312"
-    }
-  ],
-  "createdBy": {
-    "dni": "00000258",
-    "role": "Atencion"
-  },
-  "createdAt": "2026-05-18T20:35:20.000Z",
-  "updatedAt": "2026-05-18T20:35:20.000Z"
-}
-```
+Actualiza una solicitud existente.
 
 ### DELETE `/api/certificate-requests/:id`
+Borra una solicitud si no tiene certificados asociados.
 
-Respuesta: `204 No Content`
+## Certificates
+Ruta base: `/api/certificates`
 
-## 8) Certificates
+### GET `/api/certificates`
+Lista certificados con filtros y paginacion.
 
-### GET `/api/certificates?page=1&limit=10`
+Filtros:
+- `certificateNumber`
+- `requestNumber`
+- `name`
+- `documentNumber`
+- `mz`
+- `lot`
+- `status`
+- `sectorId`
+- `terrainTypeId`
+- `createdByRoleId`
+- `search`
 
-Filtros opcionales:
-
-- `certificateNumber` — busqueda parcial del numero de certificado
-- `requestNumber` — busqueda por numero de solicitud asociado
-- `name` — nombre del propietario (busca en cliente y partner)
-- `documentNumber` — DNI del propietario (busca en cliente y partner)
-- `mz` — manzana
-- `lot` — lote
-- `status=Por Firmar|Por Recoger|Entregado`
-- `sectorId` — ID del sector
-- `terrainTypeId` — ID del tipo de terreno
+Example response:
+```json
+{
+  "message": "Certificados encontrados correctamente",
+  "error": false,
+  "status": 200,
+  "data": [
+    {
+      "id": 1,
+      "certificateNumber": "024126",
+      "requestNumber": "003812-26",
+      "owners": [
+        {
+          "id": 5428,
+          "fullName": "Luis Enrique Ramos Arias",
+          "documentNumber": "15361523",
+          "order": 1,
+          "source": "primary"
+        }
+      ],
+      "terrain": {
+        "terrainType": {
+          "id": 4,
+          "name": "VIVIENDA",
+          "terrainTypeConfigId": 3,
+          "config": {
+            "id": 3,
+            "key": "RECTANGULAR_WITH_OPTIONS",
+            "label": "Rectangular con opciones",
+            "formMode": "RECTANGULAR_AUTO",
+            "showMzLot": true,
+            "allowAdditionalMeasure": true,
+            "allowAreaPerimeterToggle": true,
+            "createdAt": "2026-06-18T03:15:28.887Z",
+            "updatedAt": "2026-06-18T03:15:28.887Z"
+          }
+        },
+        "width": 10,
+        "length": 20,
+        "totalArea": 200,
+        "area": null,
+        "perimeter": null,
+        "additionalWidth": null,
+        "additionalLength": null,
+        "measurementModeUsed": "RECTANGULAR_AUTO"
+      },
+      "location": {
+        "sectors": { "id": 15, "name": "VIGARAY" },
+        "mz": "LL-A",
+        "lot": "6"
+      },
+      "borders": {
+        "north": "LOTE 11",
+        "south": "CALLE VICENTE AVALOS",
+        "east": "LOTE 07 Y 08",
+        "west": "LOTE 05"
+      },
+      "status": "Por Firmar",
+      "createdBy": { "dni": "22222222", "role": "Presidente" },
+      "createdAt": "2026-07-06T17:55:18.232Z",
+      "updatedAt": "2026-07-06T17:55:18.255Z"
+    }
+  ],
+  "total": 23840,
+  "limit": 10,
+  "totalPages": 2384,
+  "page": 1,
+  "pagingCounter": 1,
+  "hasPrevPage": false,
+  "hasNextPage": true,
+  "prevPage": null,
+  "nextPage": 2
+}
+```
 
 ### GET `/api/certificates/download/:filename`
-
-Descarga el PDF por nombre de archivo (ej: `certificado-000001.pdf`). El PDF se sirve inline.
-Internamente busca el certificado por `certificateNumber` extrayendolo del nombre del archivo.
+Descarga el PDF de un certificado.
 
 ### GET `/api/certificates/by-number/:number`
-
-Busca un certificado por su numero exacto (ej: `000001`). Util para el formulario de solicitudes de acta.
+Busca un certificado por numero exacto.
 
 ### GET `/api/certificates/:id`
+Devuelve un certificado por ID.
 
 ### GET `/api/certificates/:id/pdf`
+Descarga el PDF de un certificado por ID.
 
-Descarga el PDF del certificado por ID. El PDF se sirve inline.
+### GET `/api/certificates/:id/delete-preview`
+Muestra las dependencias antes de borrar.
 
 ### POST `/api/certificates`
+Crea un certificado nuevo.
 
-`owners` es un array de objetos con `id` del cliente. El primer elemento es el propietario principal (`clientId`), el segundo (opcional) es el conyuge/partner (`partnerId`).
-`requestNumber` debe corresponder a una solicitud de certificado existente.
-`createdBy` se asigna automaticamente desde el token JWT.
-
+Body:
 ```json
 {
   "owners": [{ "id": 1 }, { "id": 2 }],
   "terrain": {
     "terrainType": { "id": 1 },
     "width": 10.5,
-    "length": 20.0,
-    "totalArea": 210.0
+    "length": 20,
+    "totalArea": 210
   },
   "location": {
     "sectors": { "id": 1 },
@@ -637,104 +706,74 @@ Descarga el PDF del certificado por ID. El PDF se sirve inline.
     "north": "LOTE 6",
     "south": "LOTE 8",
     "east": "LOTE 5",
-    "west": "CALLE FRANCISCO AVALOS"
+    "west": "CALLE PRINCIPAL"
   },
-  "requestNumber": "003223-26"
+  "requestNumber": "003223-26",
+  "certificateRequestId": 1
 }
 ```
 
 ### PUT `/api/certificates/:id`
-
-```json
-{
-  "owners": [{ "id": 1 }],
-  "terrain": {
-    "terrainType": { "id": 1 },
-    "width": 12.0,
-    "length": 25.0,
-    "totalArea": 300.0
-  },
-  "location": {
-    "sectors": { "id": 2 },
-    "mz": "MZ-1",
-    "lot": "L-5"
-  },
-  "borders": {
-    "north": "CALLE LOS OLIVOS",
-    "south": "LOTE 3",
-    "east": "LOTE 4",
-    "west": "AV. PRINCIPAL"
-  },
-  "status": "Por Recoger"
-}
-```
-
-Estructura de respuesta de `GET /api/certificates/:id`:
-
-```json
-{
-  "id": 1,
-  "owners": [
-    {
-      "id": 1,
-      "fullName": "LUZ SELENE PALOMINO ALVAREZ",
-      "documentNumber": "30422693"
-    },
-    {
-      "id": 2,
-      "fullName": "CESAR AUGUSTO BARDALES ASTE",
-      "documentNumber": "42538515"
-    }
-  ],
-  "terrain": {
-    "terrainType": {
-      "id": 1,
-      "name": "VIVIENDA"
-    },
-    "width": 10.5,
-    "length": 20.0,
-    "totalArea": 210.0
-  },
-  "location": {
-    "sectors": {
-      "id": 1,
-      "name": "VIGARAY"
-    },
-    "mz": "L-2",
-    "lot": "7"
-  },
-  "borders": {
-    "north": "LOTE 6",
-    "south": "LOTE 8",
-    "east": "LOTE 5",
-    "west": "CALLE FRANCISCO AVALOS"
-  },
-  "certificateNumber": "000001",
-  "requestNumber": "003223-26",
-  "status": "Entregado",
-  "createdBy": {
-    "dni": "00000258",
-    "role": "ATENCION"
-  },
-  "createdAt": "2026-05-19T20:35:20Z",
-  "updatedAt": "2026-05-19T20:35:20Z"
-}
-```
+Actualiza un certificado existente.
 
 ### DELETE `/api/certificates/:id`
+Borra un certificado si no tiene dependencias.
 
-Respuesta: `204 No Content`
+## Assembly Record Requests
+Ruta base: `/api/assembly-record-requests`
 
-## 9) Assembly Record Requests (sin estado)
+### GET `/api/assembly-record-requests`
+Lista solicitudes de acta con paginacion.
 
-### GET `/api/assembly-record-requests?page=1&limit=10`
+Filtro:
+- `search`
+
+Example response:
+```json
+{
+  "message": "Solicitudes de acta encontradas correctamente",
+  "error": false,
+  "status": 200,
+  "data": [
+    {
+      "id": 1,
+      "code": "SOL-ACTA-000001",
+      "client": {
+        "id": 1,
+        "fullName": "Arias Aburto, Olga Lidia",
+        "documentNumber": "80093634"
+      },
+      "certificate": {
+        "id": 1,
+        "certificateNumber": "000001"
+      },
+      "description": "Solicitud de acta de asamblea",
+      "createdAt": "2026-05-18T20:35:20.000Z",
+      "updatedAt": "2026-05-18T20:35:20.000Z"
+    }
+  ],
+  "total": 242,
+  "limit": 10,
+  "totalPages": 25,
+  "page": 1,
+  "pagingCounter": 1,
+  "hasPrevPage": false,
+  "hasNextPage": true,
+  "prevPage": null,
+  "nextPage": 2
+}
+```
+
+### GET `/api/assembly-record-requests/download/:filename`
+Descarga el PDF de una solicitud de acta.
 
 ### GET `/api/assembly-record-requests/:id`
+Devuelve una solicitud de acta por ID.
 
 ### GET `/api/assembly-record-requests/:id/preview`
+Genera un resumen rapido de la solicitud.
 
-Retorna un resumen de la solicitud:
-
+Example response:
 ```json
 {
   "code": "SOL-ACTA-000001",
@@ -745,15 +784,15 @@ Retorna un resumen de la solicitud:
 ```
 
 ### GET `/api/assembly-record-requests/:id/pdf`
+Descarga el PDF de la solicitud por ID.
 
-Nota: Retorna el PDF en `inline` (visualizacion en navegador).
-
-### GET `/api/assembly-record-requests/download/:filename`
-
-Descarga un PDF previamente generado por su nombre de archivo. Ejemplo: `solicitud-acta-SOL-ACTA-000001.pdf`
+### GET `/api/assembly-record-requests/:id/delete-preview`
+Muestra el impacto de borrar la solicitud.
 
 ### POST `/api/assembly-record-requests`
+Crea una solicitud de acta de asamblea.
 
+Body:
 ```json
 {
   "clientId": 1,
@@ -763,39 +802,37 @@ Descarga un PDF previamente generado por su nombre de archivo. Ejemplo: `solicit
 ```
 
 ### PUT `/api/assembly-record-requests/:id`
+Actualiza una solicitud de acta.
 
+### DELETE `/api/assembly-record-requests/:id`
+Borra una solicitud de acta.
+
+## Dashboard
+Ruta base: `/api/dashboard`
+
+### GET `/api/dashboard/summary`
+Devuelve los totales principales del sistema.
+
+Example response:
 ```json
 {
-  "description": "Solicitud validada"
+  "certificates": 23840,
+  "clients": 10491,
+  "comuneros": 4780,
+  "terceros": 5711,
+  "terrainTypes": 13,
+  "sectors": 72
 }
 ```
 
-### DELETE `/api/assembly-record-requests/:id`
-
-Respuesta: `204 No Content`
-
-## 10) Dashboard
-
-### GET `/api/dashboard/summary`
-
-Devuelve totales de:
-
-- certificados
-- clientes
-- terrainTypes
-- sectors
-
 ### GET `/api/dashboard/status-breakdown`
+Agrupa certificados por estado.
 
-Devuelve conteo de certificados agrupados por estado (`PorFirmar`, `PorRecoger`, `Entregado`), cada uno con su color.
+Query opcional:
+- `from=YYYY-MM-DD`
+- `to=YYYY-MM-DD`
 
-Query params opcionales:
-
-- `from=YYYY-MM-DD` — filtrar desde esta fecha (inicio del dia UTC)
-- `to=YYYY-MM-DD` — filtrar hasta esta fecha (fin del dia UTC)
-
-Respuesta:
-
+Example response:
 ```json
 [
   { "name": "Por firmar", "value": 5, "color": "oklch(0.6 0.22 25)" },
@@ -805,16 +842,13 @@ Respuesta:
 ```
 
 ### GET `/api/dashboard/monthly-activity`
+Resume la actividad por mes.
 
-Devuelve certificados, solicitudes de certificados y solicitudes de acta agrupados por mes.
+Query opcional:
+- `from=YYYY-MM-DD`
+- `to=YYYY-MM-DD`
 
-Query params opcionales (aplica tambien a status-breakdown):
-
-- `from=YYYY-MM-DD` — filtrar desde esta fecha (inicio del dia UTC)
-- `to=YYYY-MM-DD` — filtrar hasta esta fecha (fin del dia UTC)
-
-Respuesta:
-
+Example response:
 ```json
 [
   { "mes": "Ene", "certificados": 120, "solicitudesCert": 60, "solicitudesActa": 25 },
@@ -823,48 +857,72 @@ Respuesta:
 ```
 
 ### GET `/api/dashboard/recent-activity`
+Devuelve las ultimas actividades registradas.
 
-Devuelve las ultimas 5 actividades (mezcla de certificados creados, solicitudes registradas y actas solicitadas), ordenadas por fecha descendente.
-
-Respuesta:
-
+Example response:
 ```json
 [
-  {
-    "id": "cert-1",
-    "usuario": "Admin",
-    "accion": "generó el certificado 000001 para LUZ SELENE PALOMINO ALVAREZ",
-    "cuando": "2026-05-19T20:35:20.000Z"
-  }
+  { "id": "cert-1", "usuario": "Piero Llanos Sanchez", "accion": "generó el certificado 000001 para Juan Perez", "cuando": "2026-07-06T00:00:00.000Z" },
+  { "id": "creq-1", "usuario": "Atencion Cliente", "accion": "registró la solicitud 003223-26 para Juan Perez", "cuando": "2026-07-05T00:00:00.000Z" }
 ]
 ```
 
-## 11) Reports
+## Reports
+Ruta base: `/api/reports`
 
 ### GET `/api/reports/certificates`
+Exporta el reporte de certificados a Excel.
 
-Exporta Excel (`.xlsx`) y acepta los mismos filtros que `GET /api/certificates`:
+Acepta los mismos filtros que `GET /api/certificates`.
 
-- `certificateNumber`, `requestNumber`, `name`, `documentNumber`, `mz`, `lot`, `status`
+Example request:
+```bash
+GET /api/reports/certificates?status=Entregado&sectorId=1
+```
 
-## Valores permitidos (enums)
+Response: archivo `reporte-certificados.xlsx`
 
-- `clientType`: `Comunero`, `Tercero`
-- `CertificateStatus`: `Por Firmar`, `Por Recoger`, `Entregado`
+## Public
+Ruta base: `/api/public`
 
-## Roles base que se crean automaticamente
+### GET `/api/public/certificates/:token`
+Verifica un certificado por su token publico.
 
-- `Admin`
-- `Presidente`
-- `AtencionCliente`
+Example response:
+```json
+{
+  "message": "Certificado verificado correctamente",
+  "error": false,
+  "status": 200,
+  "data": {
+    "certificateNumber": "000001",
+    "owners": [
+      { "fullName": "Juan Perez", "documentNumber": "12345678" }
+    ],
+    "terrain": {
+      "terrainType": { "name": "VIVIENDA" },
+      "width": 10,
+      "length": 20,
+      "totalArea": 200,
+      "area": null,
+      "perimeter": null,
+      "additionalWidth": null,
+      "additionalLength": null
+    },
+    "sector": "VIGARAY",
+    "location": { "mz": "L-2", "lot": "7" },
+    "borders": {
+      "north": "LOTE 6",
+      "south": "LOTE 8",
+      "east": "LOTE 5",
+      "west": "CALLE PRINCIPAL"
+    },
+    "createdAt": "2026-05-18T20:35:20.000Z"
+  }
+}
+```
 
-## Orden recomendado para pruebas 1 a 1
-
-1. `POST /api/auth/login` (guardar cookie `token` o reutilizarla en Postman)
-2. `POST /api/users` (crear usuario, publico)
-3. Crear catalogos: sectors + terrain-types
-4. Crear clients
-5. Crear certificate-requests
-6. Crear certificates
-7. Crear assembly-record-requests
-8. Probar previews/pdf/reportes/dashboard
+## Notes
+- `page` y `limit` aplican a todos los listados.
+- Los archivos PDF se sirven `inline`.
+- Los exports de reportes se descargan como archivo `.xlsx`.

@@ -1,23 +1,13 @@
-const API_URL = `${process.env.API_BASE_URL}/backend-certificado/sector-location/combo`;
-const BEARER_TOKEN = process.env.BEARER_TOKEN;
+const parseDate = (value) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? new Date() : date;
+};
 
-async function seedSectors(prisma) {
+async function seedSectors(prisma, api) {
   let remoteSectors;
 
   try {
-    const res = await fetch(API_URL, {
-      headers: { Authorization: `Bearer ${BEARER_TOKEN}` },
-    });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      console.warn(`  ⚠ API responded with ${res.status}${body ? ": " + body.slice(0, 150) : ""}, skipping`);
-      return;
-    }
-
-    remoteSectors = await res.json();
-
-    remoteSectors = remoteSectors?.data;
+    remoteSectors = await api.listAll("/api/sectors", { limit: 100 });
 
     if (!Array.isArray(remoteSectors) || remoteSectors.length === 0) {
       console.log("  ℹ No sectors to import");
@@ -38,8 +28,8 @@ async function seedSectors(prisma) {
     await prisma.sector.create({
       data: {
         name: raw.name,
-        createdAt: new Date(raw.createdAt),
-        updatedAt: new Date(raw.updatedAt),
+        createdAt: parseDate(raw.createdAt),
+        updatedAt: parseDate(raw.updatedAt),
       },
     });
     imported++;

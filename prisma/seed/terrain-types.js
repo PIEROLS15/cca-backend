@@ -1,9 +1,12 @@
-const API_URL = `${process.env.API_BASE_URL}/backend-certificado/terrain-type/combo`;
-const BEARER_TOKEN = process.env.BEARER_TOKEN;
 const {
   TERRAIN_TYPE_CONFIG_DEFINITIONS,
   resolveTerrainTypeConfigKey,
 } = require("../../src/constants/terrain-type-configs");
+
+const parseDate = (value) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? new Date() : date;
+};
 
 async function ensureTerrainTypeConfigs(prisma) {
   for (const config of TERRAIN_TYPE_CONFIG_DEFINITIONS) {
@@ -24,22 +27,11 @@ async function ensureTerrainTypeConfigs(prisma) {
   return new Map(configs.map((config) => [config.key, config.id]));
 }
 
-async function seedTerrainTypes(prisma) {
+async function seedTerrainTypes(prisma, api) {
   let remoteTypes;
 
   try {
-    const res = await fetch(API_URL, {
-      headers: { Authorization: `Bearer ${BEARER_TOKEN}` },
-    });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      console.warn(`  ⚠ API responded with ${res.status}${body ? ": " + body.slice(0, 150) : ""}, skipping`);
-      return;
-    }
-
-    remoteTypes = await res.json();
-    remoteTypes = remoteTypes?.data;
+    remoteTypes = await api.listAll("/api/terrain-types", { limit: 100 });
 
     if (!Array.isArray(remoteTypes) || remoteTypes.length === 0) {
       console.log("  ℹ No terrain types to import");
@@ -74,8 +66,8 @@ async function seedTerrainTypes(prisma) {
       data: {
         name: raw.name,
         terrainTypeConfigId,
-        createdAt: new Date(raw.createdAt),
-        updatedAt: new Date(raw.updatedAt),
+        createdAt: parseDate(raw.createdAt),
+        updatedAt: parseDate(raw.updatedAt),
       },
     });
     imported++;
