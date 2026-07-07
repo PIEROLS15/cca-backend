@@ -1,169 +1,80 @@
-const BEARER_TOKEN = process.env.BEARER_TOKEN;
-const API_URL = `${process.env.API_BASE_URL}/backend-certificado/request-certificate`;
-const PAGE_LIMIT = 200;
-const {
-  normalizeAttachments,
-  normalizeCertificateTypes,
-  normalizeRequestDestination,
-} = require("../../src/api/certificate-requests/utils/certificate-request-legacy.utils");
+const parseDate = (value) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? new Date() : date;
+};
 
-async function fetchPage(page) {
-  const url = `${API_URL}?limit=${PAGE_LIMIT}&page=${page}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${BEARER_TOKEN}` },
-  });
+const normalizeDni = (value) => String(value || "").trim();
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`HTTP ${res.status}${body ? ": " + body.slice(0, 150) : ""}`);
+async function seedCertificateRequests(prisma, api) {
+  const existingCount = await prisma.certificateRequest.count();
+  if (existingCount > 0 && !process.env.FORCE_SEEDS) {
+    console.log(`  ℹ ${existingCount} solicitudes de certificado ya existen, saltando`);
+    return;
   }
 
-  const json = await res.json();
-  return json?.data;
-}
-
-async function seedCertificateRequests(prisma) {
-  const existingCount = await prisma.certificateRequest.count();
-  const preserveOnly = existingCount > 0 && !process.env.FORCE_SEEDS;
-
-  console.log("  ℹ Cargando primera página para determinar total...");
-
-  let firstPage;
+  let docs;
   try {
-    firstPage = await fetchPage(1);
+    docs = await api.listAll("/api/certificate-requests", { limit: 100 });
   } catch (err) {
     console.warn(`  ⚠ Could not fetch certificate requests: ${err.message}`);
     return;
   }
 
-  if (!firstPage?.docs?.length) {
+  if (!Array.isArray(docs) || docs.length === 0) {
     console.log("  ℹ No certificate requests to import");
     return;
   }
 
-  const totalPages = firstPage.totalPages || 1;
-  console.log(`  ℹ ${firstPage.totalDocs} solicitudes en ${totalPages} páginas`);
-
-  const [userByDni, clientByDoc] = await Promise.all([
-    prisma.user.findMany({ select: { id: true, dni: true } }).then((users) => {
-      const map = new Map();
-      for (const u of users) {
-        if (u.dni) map.set(u.dni, u.id);
-      }
-      return map;
-    }),
-    prisma.client.findMany({ select: { id: true, documentNumber: true } }).then((clients) => {
-      const map = new Map();
-      for (const c of clients) map.set(c.documentNumber, c.id);
-      return map;
-    }),
-  ]);
-
-  const allDocs = [...firstPage.docs];
-
-  for (let page = 2; page <= totalPages; page++) {
-    try {
-      const data = await fetchPage(page);
-      if (data?.docs) allDocs.push(...data.docs);
-      process.stdout.write(`    Página ${page}/${totalPages}\r`);
-    } catch (err) {
-      console.warn(`\n  ⚠ Error en página ${page}: ${err.message}`);
+  const userByDni = await prisma.user.findMany({ select: { id: true, dni: true } }).then((users) => {
+    const map = new Map();
+    for (const user of users) {
+      if (user.dni) map.set(normalizeDni(user.dni), user.id);
     }
-  }
-  console.log(`\n  ℹ Total ${allDocs.length} solicitudes descargadas`);
+    return map;
+  });
 
-  if (preserveOnly) {
-    let preserved = 0;
-
-    for (const doc of allDocs) {
-      const requestNumber = doc.countRequestCertificate?.trim();
-      if (!requestNumber) {
-        continue;
-      }
-
-      const updatedRows = await prisma.$executeRaw`
-        UPDATE "CertificateRequest"
-        SET "legacyPayload" = ${JSON.stringify(doc)}::jsonb
-        WHERE "requestNumber" = ${requestNumber}
-          AND "legacyPayload" IS NULL
-      `;
-      preserved += Number(updatedRows || 0);
-    }
-
-    console.log(`  ✓ ${preserved} solicitudes preservadas con legacyPayload`);
-    return;
-  }
-
-  // Crear placeholders para clientes faltantes
-  const missingDocs = new Set();
-  for (const doc of allDocs) {
-    if (doc.documentClient && !clientByDoc.get(doc.documentClient)) {
-      missingDocs.add(doc.documentClient);
-    }
-  }
-  if (missingDocs.size > 0) {
-    console.log(`  ℹ ${missingDocs.size} clientes faltantes, creando placeholders...`);
-    for (const doc of allDocs) {
-      if (!missingDocs.has(doc.documentClient)) continue;
-      missingDocs.delete(doc.documentClient);
-      const createdAt = new Date(doc.createdAt);
-      const placeholder = await prisma.client.create({
-        data: {
-          documentNumber: doc.documentClient,
-          fullName: doc.fullNameClient?.trim() || "-",
-          createdAt,
-          updatedAt: createdAt,
-        },
-      });
-      clientByDoc.set(doc.documentClient, placeholder.id);
-      console.log(`    Placeholder: ${doc.documentClient} (${doc.fullNameClient})`);
-    }
-  }
-
-  const existingNumbers = new Set(
-    (await prisma.certificateRequest.findMany({ select: { requestNumber: true } })).map((r) => r.requestNumber)
-  );
+  const existingNumbers = new Set((await prisma.certificateRequest.findMany({ select: { requestNumber: true } })).map((row) => row.requestNumber));
 
   let imported = 0;
   let skipped = 0;
 
-  for (const doc of allDocs) {
-    const requestNumber = doc.countRequestCertificate?.trim();
+  for (const doc of docs) {
+    const requestNumber = String(doc.requestNumber || "").trim();
     if (!requestNumber || existingNumbers.has(requestNumber)) {
       skipped++;
       continue;
     }
 
-    const clientId = clientByDoc.get(doc.documentClient);
+    const clientId = Number(doc.client?.id);
     if (!clientId) {
       skipped++;
+      console.warn(`  ⚠ Cliente no encontrado para solicitud ${requestNumber}`);
       continue;
     }
 
-    const partnerId = doc.documentPartnerClient?.trim()
-      ? clientByDoc.get(doc.documentPartnerClient.trim()) || null
-      : null;
-
-    const userId = doc.createdByDni ? userByDni.get(doc.createdByDni) || null : null;
+    const partnerId = Number(doc.partnerClient?.id) || null;
+    const userId = doc.createdBy?.dni ? userByDni.get(normalizeDni(doc.createdBy.dni)) || null : null;
 
     try {
       await prisma.certificateRequest.create({
         data: {
           requestNumber,
-          clientId,
-          userId,
-          partnerId,
-          description: doc.description?.trim() || null,
-          destination: normalizeRequestDestination(doc.destination),
+          client: { connect: { id: clientId } },
+          user: userId ? { connect: { id: userId } } : undefined,
+          partner: partnerId ? { connect: { id: partnerId } } : undefined,
+          description: doc.description?.trim() || doc.requestDescription?.trim() || null,
+          requestDescription: doc.requestDescription?.trim() || doc.description?.trim() || null,
+          destination: doc.destination?.trim() || null,
           exposure: doc.exposure?.trim() || null,
           sectorLocation: doc.sectorLocation?.trim() || null,
-          certificateTypes: normalizeCertificateTypes(Array.isArray(doc.type) ? doc.type : [], doc),
-          attachments: normalizeAttachments(Array.isArray(doc.attachment) ? doc.attachment : [], doc),
+          certificateTypes: doc.certificateTypes || [],
+          attachments: doc.attachments || [],
           legacyPayload: doc,
-          createdAt: new Date(doc.createdAt),
-          updatedAt: new Date(doc.updatedAt),
+          createdAt: parseDate(doc.createdAt),
+          updatedAt: parseDate(doc.updatedAt),
         },
       });
+      existingNumbers.add(requestNumber);
       imported++;
     } catch (err) {
       console.warn(`  ⚠ Error importing request "${requestNumber}": ${err.message}`);

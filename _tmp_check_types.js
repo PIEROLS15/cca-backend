@@ -1,1 +1,0 @@
-const service = require("./src/api/terrain-types/services/terrain-types.service"); service.listTerrainTypes({ page: 1, limit: 3 }).then(r => { console.log(JSON.stringify(r.data ?? r.docs ?? r, null, 2)); process.exit(0); }).catch(err => { console.error(err); process.exit(1); });
