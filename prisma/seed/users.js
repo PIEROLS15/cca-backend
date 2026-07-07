@@ -9,66 +9,135 @@ const parseDate = (value) => {
 
 const normalizeDni = (value) => String(value || "").trim();
 
+const parseLastCertificate = (value) => {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const numeric = Number.parseInt(String(value).trim(), 10);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
 async function seedUsers(prisma, api) {
   let remoteUsers;
 
   try {
     remoteUsers = await api.listAll("/api/users", { limit: 100 });
   } catch (err) {
-    console.warn(`  ⚠ Could not fetch users: ${err.message}`);
+    console.warn(`  ⚠ No se pudieron obtener los usuarios: ${err.message}`);
     return;
   }
 
   if (!Array.isArray(remoteUsers) || remoteUsers.length === 0) {
-    console.log("  ℹ No users to import");
+    console.log("  ℹ No hay usuarios para importar");
     return;
   }
 
   const hash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+  const remoteIds = new Set();
+  const existingUsers = await prisma.user.findMany({
+    select: {
+      id: true,
+      username: true,
+      _count: {
+        select: {
+          certificates: true,
+          certificateRequests: true,
+          assemblyRecordRequest: true,
+        },
+      },
+    },
+  });
+
+  let imported = 0;
+  let updated = 0;
+  let skipped = 0;
 
   for (const remoteUser of remoteUsers) {
-    if (!remoteUser?.username) {
+    const id = Number(remoteUser?.id);
+    if (!id || !remoteUser?.username) {
+      skipped++;
       continue;
     }
 
-    const roleName = remoteUser.role?.name || remoteUser.roleName || "AtencionCliente";
-    const role = await prisma.role.findUnique({ where: { name: roleName } });
+    remoteIds.add(id);
+
+    const roleId = Number(remoteUser.role?.id || remoteUser.roleId);
+    const role = roleId ? await prisma.role.findUnique({ where: { id: roleId } }) : null;
     if (!role) {
-      console.warn(`  ⚠ Rol "${roleName}" no encontrado para usuario "${remoteUser.username}", saltando`);
+      const roleLabel = remoteUser.role?.name || remoteUser.roleName || "sin rol";
+      console.warn(`  ⚠ Rol "${roleLabel}" no encontrado para el usuario "${remoteUser.username}", saltando`);
+      skipped++;
       continue;
     }
+
+    const wasExisting = existingUsers.some((user) => user.id === id);
+    const lastCertificate = parseLastCertificate(remoteUser.lastCertificate);
+    const normalizedEmail = remoteUser.email ? String(remoteUser.email).trim() : null;
+    const normalizedDni = remoteUser.dni ? normalizeDni(remoteUser.dni) : null;
 
     await prisma.user.upsert({
-      where: { username: remoteUser.username },
+      where: { id },
       create: {
+        id,
         username: remoteUser.username,
         password: hash,
         fullName: String(remoteUser.fullName || "-").trim() || "-",
-        email: remoteUser.email && String(remoteUser.email).includes("@") ? String(remoteUser.email).trim() : `${remoteUser.username}@importado.local`,
-        dni: remoteUser.dni ? normalizeDni(remoteUser.dni) : null,
+        email: normalizedEmail,
+        dni: normalizedDni,
         isActive: remoteUser.isActive !== undefined ? Boolean(remoteUser.isActive) : true,
         certificateRangeStart: remoteUser.certificateRangeStart ?? null,
         certificateRangeEnd: remoteUser.certificateRangeEnd ?? null,
-        lastCertificate: remoteUser.lastCertificate ? Number.parseInt(String(remoteUser.lastCertificate).trim(), 10) || null : null,
+        lastCertificate,
         roleId: role.id,
         createdAt: parseDate(remoteUser.createdAt),
         updatedAt: parseDate(remoteUser.updatedAt),
       },
       update: {
+        username: remoteUser.username,
         fullName: String(remoteUser.fullName || "-").trim() || "-",
-        email: remoteUser.email && String(remoteUser.email).includes("@") ? String(remoteUser.email).trim() : `${remoteUser.username}@importado.local`,
-        dni: remoteUser.dni ? normalizeDni(remoteUser.dni) : null,
+        email: normalizedEmail,
+        dni: normalizedDni,
         isActive: remoteUser.isActive !== undefined ? Boolean(remoteUser.isActive) : true,
         certificateRangeStart: remoteUser.certificateRangeStart ?? null,
         certificateRangeEnd: remoteUser.certificateRangeEnd ?? null,
-        lastCertificate: remoteUser.lastCertificate ? Number.parseInt(String(remoteUser.lastCertificate).trim(), 10) || null : null,
+        lastCertificate,
         roleId: role.id,
+        createdAt: parseDate(remoteUser.createdAt),
         updatedAt: parseDate(remoteUser.updatedAt),
       },
     });
 
-    console.log(`  ✓ Usuario "${remoteUser.username}"`);
+    if (wasExisting) {
+      updated++;
+    } else {
+      imported++;
+    }
+
+    console.log(`  ✓ Usuario #${id} "${remoteUser.username}"`);
   }
+
+  const localBootstrapUser = existingUsers.find((user) => user.username === "pierols");
+  for (const user of existingUsers) {
+    if (remoteIds.has(user.id) || user.username === "pierols") {
+      continue;
+    }
+
+    const dependencyCount = user._count.certificates + user._count.certificateRequests + user._count.assemblyRecordRequest;
+    if (dependencyCount > 0) {
+      console.warn(`  ⚠ No se eliminó el usuario #${user.id} "${user.username}" porque tiene ${dependencyCount} registros asociados`);
+      continue;
+    }
+
+    await prisma.user.delete({ where: { id: user.id } });
+    console.log(`  ✓ Usuario eliminado #${user.id} "${user.username}"`);
+  }
+
+  if (!localBootstrapUser) {
+    console.log("  ℹ No se encontró el usuario local 'pierols' en la base de datos");
+  }
+
+  console.log(`  ✓ ${imported} usuarios importados, ${updated} actualizados, ${skipped} omitidos`);
 }
 
 module.exports = { seedUsers };

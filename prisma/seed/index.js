@@ -15,9 +15,9 @@ const prisma = new PrismaClient();
 const SEEDERS = [
   { name: "Roles", fn: seedRoles },
   { name: "Usuarios", fn: seedUsers },
+  { name: "Clientes", fn: seedClients },
   { name: "Sectores", fn: seedSectors },
   { name: "Tipos de terreno", fn: seedTerrainTypes },
-  { name: "Clientes", fn: seedClients },
   { name: "Solicitudes de certificados", fn: seedCertificateRequests },
   { name: "Certificados", fn: seedCertificates },
   { name: "Solicitudes de acta de asamblea", fn: seedAssemblyRecordRequests },
