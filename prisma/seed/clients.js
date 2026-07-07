@@ -3,6 +3,14 @@ const parseDate = (value) => {
   return Number.isNaN(date.getTime()) ? new Date() : date;
 };
 
+const normalizeText = (value) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return String(value).trim() || null;
+};
+
 const parseLicenseSequence = (value) => {
   if (value === null || value === undefined || value === "") {
     return null;
@@ -13,87 +21,165 @@ const parseLicenseSequence = (value) => {
 };
 
 async function seedClients(prisma, api) {
-  const existingCount = await prisma.client.count();
-  if (existingCount > 0 && !process.env.FORCE_SEEDS) {
-    console.log(`  ℹ ${existingCount} clientes ya existen, saltando`);
-    return;
-  }
-
   try {
     const clients = await api.listAll("/api/clients", { limit: 100 });
 
     if (!Array.isArray(clients) || clients.length === 0) {
-      console.log("  ℹ No clients to import");
+      console.log("  ℹ No hay clientes para importar");
       return;
     }
 
-    const clientRecords = clients.map((client) => ({
-      fullName: String(client.fullName || "-").trim() || "-",
-      documentNumber: String(client.documentNumber || "").trim(),
-      address: client.address ? String(client.address).trim() : null,
-      phone: client.phone ? String(client.phone).trim() : null,
-      createdAt: parseDate(client.createdAt),
-      updatedAt: parseDate(client.updatedAt),
-    })).filter((client) => client.documentNumber);
-
-    const comuneroRecords = clients
-      .filter((client) => client.clientType === "Comunero")
+    const remoteClients = clients
       .map((client) => ({
-        documentNumber: String(client.documentNumber || "").trim(),
-        licenseSequence: parseLicenseSequence(client.licenseSequence ?? client.nro_licence),
-        createdAt: parseDate(client.createdAt),
-        updatedAt: parseDate(client.updatedAt),
+        id: Number(client?.id),
+        fullName: normalizeText(client?.fullName) || "-",
+        documentNumber: normalizeText(client?.documentNumber),
+        address: normalizeText(client?.address),
+        phone: normalizeText(client?.phone),
+        clientType: client?.clientType,
+        licenseSequence: parseLicenseSequence(client?.licenseSequence ?? client?.nro_licence),
+        createdAt: parseDate(client?.createdAt),
+        updatedAt: parseDate(client?.updatedAt),
       }))
-      .filter((client) => client.documentNumber);
+      .filter((client) => client.id && client.documentNumber);
 
-    const existingDocs = await prisma.client.findMany({
-      select: { documentNumber: true },
+    const existingClients = await prisma.client.findMany({
+      select: {
+        id: true,
+        documentNumber: true,
+        _count: {
+          select: {
+            certificates: true,
+            partnerCertificates: true,
+            certificateRequests: true,
+            partnerRequests: true,
+            assemblyRecordRequests: true,
+            certificateOwners: true,
+          },
+        },
+      },
     });
-    const existingSet = new Set(existingDocs.map((client) => client.documentNumber));
 
-    const newClientRecords = clientRecords.filter((client) => !existingSet.has(client.documentNumber));
-
-    if (newClientRecords.length === 0) {
-      console.log(`  ✓ 0 clientes nuevos (${clientRecords.length} ya existentes)`);
-      const comuneroCount = comuneroRecords.length;
-      console.log(`    ${comuneroCount} comuneros, ${clientRecords.length - comuneroCount} terceros`);
-      return;
-    }
+    const existingById = new Map(existingClients.map((client) => [client.id, client]));
+    const existingByDocument = new Map(existingClients.map((client) => [client.documentNumber, client]));
+    const remoteIds = new Set();
 
     let imported = 0;
-    for (let i = 0; i < newClientRecords.length; i += 100) {
-      const batch = newClientRecords.slice(i, i + 100);
-      await prisma.client.createMany({ data: batch, skipDuplicates: true });
-      imported += batch.length;
-    }
+    let updated = 0;
+    let deleted = 0;
+    let skipped = 0;
 
-    const createdClients = await prisma.client.findMany({
-      where: { documentNumber: { in: newClientRecords.map((client) => client.documentNumber) } },
-      select: { id: true, documentNumber: true },
-    });
-    const clientIdByDoc = new Map(createdClients.map((client) => [client.documentNumber, client.id]));
+    for (const remoteClient of remoteClients) {
+      remoteIds.add(remoteClient.id);
 
-    const profileRecords = comuneroRecords
-      .filter((client) => clientIdByDoc.has(client.documentNumber))
-      .map((client) => ({
-        clientId: clientIdByDoc.get(client.documentNumber),
-        licenseSequence: client.licenseSequence,
-        createdAt: client.createdAt,
-        updatedAt: client.updatedAt,
-      }));
+      const byId = existingById.get(remoteClient.id) || null;
+      const byDocument = !byId ? existingByDocument.get(remoteClient.documentNumber) || null : null;
 
-    if (profileRecords.length > 0) {
-      for (let i = 0; i < profileRecords.length; i += 100) {
-        const batch = profileRecords.slice(i, i + 100);
-        await prisma.commoner.createMany({ data: batch, skipDuplicates: true });
+      if (byDocument && byDocument.id !== remoteClient.id) {
+        const dependencyCount =
+          byDocument._count.certificates +
+          byDocument._count.partnerCertificates +
+          byDocument._count.certificateRequests +
+          byDocument._count.partnerRequests +
+          byDocument._count.assemblyRecordRequests +
+          byDocument._count.certificateOwners;
+
+        if (dependencyCount > 0) {
+          console.warn(`  ⚠ No se pudo recrear el cliente #${remoteClient.id} "${remoteClient.documentNumber}" porque el registro local equivalente tiene ${dependencyCount} dependencias`);
+          skipped++;
+          continue;
+        }
+
+        await prisma.client.delete({ where: { id: byDocument.id } });
+        existingById.delete(byDocument.id);
+        existingByDocument.delete(byDocument.documentNumber);
+      }
+
+      try {
+        await prisma.$transaction(async (tx) => {
+          const client = await tx.client.upsert({
+            where: { id: remoteClient.id },
+            create: {
+              id: remoteClient.id,
+              fullName: remoteClient.fullName,
+              documentNumber: remoteClient.documentNumber,
+              address: remoteClient.address,
+              phone: remoteClient.phone,
+              createdAt: remoteClient.createdAt,
+              updatedAt: remoteClient.updatedAt,
+            },
+            update: {
+              fullName: remoteClient.fullName,
+              documentNumber: remoteClient.documentNumber,
+              address: remoteClient.address,
+              phone: remoteClient.phone,
+              createdAt: remoteClient.createdAt,
+              updatedAt: remoteClient.updatedAt,
+            },
+          });
+
+          if (remoteClient.clientType === "Comunero") {
+            await tx.commoner.upsert({
+              where: { clientId: client.id },
+              create: {
+                clientId: client.id,
+                licenseSequence: remoteClient.licenseSequence,
+                createdAt: remoteClient.createdAt,
+                updatedAt: remoteClient.updatedAt,
+              },
+              update: {
+                licenseSequence: remoteClient.licenseSequence,
+                createdAt: remoteClient.createdAt,
+                updatedAt: remoteClient.updatedAt,
+              },
+            });
+          } else {
+            await tx.commoner.deleteMany({ where: { clientId: client.id } });
+          }
+        });
+
+        if (byId || byDocument) {
+          updated++;
+        } else {
+          imported++;
+        }
+
+        console.log(`  ✓ Cliente #${remoteClient.id} "${remoteClient.documentNumber}"`);
+      } catch (err) {
+        skipped++;
+        console.warn(`  ⚠ No se pudo importar el cliente #${remoteClient.id} "${remoteClient.documentNumber}": ${err.message}`);
       }
     }
 
-    const comuneroCount = comuneroRecords.length;
-    console.log(`  ✓ ${imported} clientes importados${imported < clientRecords.length ? ` (${clientRecords.length - imported} ya existentes)` : ""}`);
-    console.log(`    ${comuneroCount} comuneros, ${clientRecords.length - comuneroCount} terceros`);
+    for (const existingClient of existingClients) {
+      if (remoteIds.has(existingClient.id)) {
+        continue;
+      }
+
+      const dependencyCount =
+        existingClient._count.certificates +
+        existingClient._count.partnerCertificates +
+        existingClient._count.certificateRequests +
+        existingClient._count.partnerRequests +
+        existingClient._count.assemblyRecordRequests +
+        existingClient._count.certificateOwners;
+
+      if (dependencyCount > 0) {
+        console.warn(`  ⚠ No se eliminó el cliente #${existingClient.id} "${existingClient.documentNumber}" porque tiene ${dependencyCount} registros asociados`);
+        skipped++;
+        continue;
+      }
+
+      await prisma.client.delete({ where: { id: existingClient.id } });
+      deleted++;
+      console.log(`  ✓ Cliente eliminado #${existingClient.id} "${existingClient.documentNumber}"`);
+    }
+
+    const comuneros = remoteClients.filter((client) => client.clientType === "Comunero").length;
+    console.log(`  ✓ ${imported} clientes importados, ${updated} actualizados, ${deleted} eliminados, ${skipped} omitidos`);
+    console.log(`    ${comuneros} comuneros, ${remoteClients.length - comuneros} terceros`);
   } catch (err) {
-    console.warn(`  ⚠ Could not fetch clients: ${err.message}`);
+    console.warn(`  ⚠ No se pudieron obtener los clientes: ${err.message}`);
   }
 }
 
