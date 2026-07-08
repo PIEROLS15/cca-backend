@@ -6,7 +6,9 @@ const {
   buildAssemblyRequestCode,
   formatAssemblyRecordRequestResponse,
   normalizeAssemblyRecordAttachments,
+  normalizeAssemblyRecordRequestStatus,
 } = require("../utils/assembly-record-requests.utils");
+const { DOCUMENT_TYPES, recordDocumentStatusHistory } = require("../../../utils/document-status-history.utils");
 
 const buildAssemblyRecordRequestData = (payload = {}) => {
   const data = {};
@@ -54,6 +56,14 @@ const buildAssemblyRecordRequestData = (payload = {}) => {
 
   if (payload.legacyPayload !== undefined) {
     data.legacyPayload = payload.legacyPayload;
+  }
+
+  if (payload.status !== undefined) {
+    const normalized = normalizeAssemblyRecordRequestStatus(payload.status);
+    if (!normalized) {
+      throw new HttpError(400, "Estado de solicitud de acta invalido");
+    }
+    data.status = normalized;
   }
 
   return data;
@@ -193,23 +203,35 @@ const createAssemblyRecordRequest = async (payload, userId) => {
 
   const data = buildAssemblyRecordRequestData(payload);
 
-  return prisma.assemblyRecordRequest.create({
-    data: {
-      code,
-      clientId,
-      certificateId,
-      userId,
-      ...data,
-    },
-    include: {
-      client: { include: { commoner: true } },
-      certificate: { include: { sector: true, terrainType: true } },
-      user: true,
-    },
-  }).then(formatAssemblyRecordRequestResponse);
+  return prisma.$transaction(async (tx) => {
+    const request = await tx.assemblyRecordRequest.create({
+      data: {
+        code,
+        clientId,
+        certificateId,
+        userId,
+        ...data,
+      },
+      include: {
+        client: { include: { commoner: true } },
+        certificate: { include: { sector: true, terrainType: true } },
+        user: true,
+      },
+    });
+
+    await recordDocumentStatusHistory(tx, {
+      documentType: DOCUMENT_TYPES.ASSEMBLY_RECORD_REQUEST,
+      documentId: request.id,
+      status: request.status,
+      changedByUserId: userId || null,
+      changedAt: request.createdAt,
+    });
+
+    return formatAssemblyRecordRequestResponse(request);
+  });
 };
 
-const updateAssemblyRecordRequest = async (id, payload) => {
+const updateAssemblyRecordRequest = async (id, payload, changedByUserId = null) => {
   const existing = await prisma.assemblyRecordRequest.findUnique({
     where: { id },
     include: {
@@ -239,20 +261,45 @@ const updateAssemblyRecordRequest = async (id, payload) => {
   }
 
   const data = buildAssemblyRecordRequestData(payload);
+  let nextStatus = null;
 
-  return prisma.assemblyRecordRequest.update({
-    where: { id },
-    data: {
-      clientId,
-      certificateId,
-      ...data,
-    },
-    include: {
-      client: { include: { commoner: true } },
-      certificate: { include: { sector: true, terrainType: true } },
-      user: true,
-    },
-  }).then(formatAssemblyRecordRequestResponse);
+  if (payload.status !== undefined) {
+    const normalized = normalizeAssemblyRecordRequestStatus(payload.status);
+    if (!normalized) {
+      throw new HttpError(400, "Estado de solicitud de acta invalido");
+    }
+    data.status = normalized;
+    nextStatus = normalized;
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.assemblyRecordRequest.update({
+      where: { id },
+      data: {
+        clientId,
+        certificateId,
+        ...data,
+      },
+      include: {
+        client: { include: { commoner: true } },
+        certificate: { include: { sector: true, terrainType: true } },
+        user: true,
+      },
+    });
+
+    if (nextStatus && nextStatus !== existing.status) {
+      await recordDocumentStatusHistory(tx, {
+        documentType: DOCUMENT_TYPES.ASSEMBLY_RECORD_REQUEST,
+        documentId: id,
+        status: nextStatus,
+        changedByUserId,
+      });
+    }
+
+    return result;
+  });
+
+  return formatAssemblyRecordRequestResponse(updated);
 };
 
 const deleteAssemblyRecordRequest = async (id) => {

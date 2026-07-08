@@ -37,7 +37,7 @@ const createCertificateRequest = asyncHandler(async (req, res) => {
 });
 
 const updateCertificateRequest = asyncHandler(async (req, res) => {
-  const request = await certificateRequestsService.updateCertificateRequest(Number(req.params.id), req.body);
+  const request = await certificateRequestsService.updateCertificateRequest(Number(req.params.id), req.body, req.user?.sub);
   res.json(request);
 });
 

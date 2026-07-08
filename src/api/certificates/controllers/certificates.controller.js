@@ -27,7 +27,7 @@ const createCertificate = asyncHandler(async (req, res) => {
 });
 
 const updateCertificate = asyncHandler(async (req, res) => {
-  const certificate = await certificatesService.updateCertificate(Number(req.params.id), req.body);
+  const certificate = await certificatesService.updateCertificate(Number(req.params.id), req.body, req.user?.sub);
   res.json(certificate);
 });
 

@@ -5,6 +5,19 @@ const {
   normalizeRequestDestination,
 } = require("./certificate-request-legacy.utils");
 
+const CERTIFICATE_REQUEST_STATUS_TO_DB = {
+  "En Proceso": "EnProceso",
+  EnProceso: "EnProceso",
+  Observado: "Observado",
+  Recepcionado: "Recepcionado",
+};
+
+const CERTIFICATE_REQUEST_STATUS_FROM_DB = {
+  EnProceso: "En Proceso",
+  Observado: "Observado",
+  Recepcionado: "Recepcionado",
+};
+
 const buildRequestNumber = (sequence, date = new Date()) => {
   const year = String(date.getFullYear()).slice(-2);
   return `${String(sequence).padStart(6, "0")}-${year}`;
@@ -42,6 +55,7 @@ const formatCertificateRequestResponse = (request) => {
     certificateTypes: normalizeCertificateTypes(request.certificateTypes || [], legacyPayload),
     exposure: request.exposure || legacyPayload?.exposure || "",
     attachments: normalizeAttachments(request.attachments || [], legacyPayload),
+    status: CERTIFICATE_REQUEST_STATUS_FROM_DB[request.status] || request.status || "En Proceso",
     createdBy: {
       dni: user?.dni || "",
       role: user?.role?.name || "",
@@ -52,9 +66,15 @@ const formatCertificateRequestResponse = (request) => {
   };
 };
 
+const normalizeCertificateRequestStatus = (value) => CERTIFICATE_REQUEST_STATUS_TO_DB[value] || null;
+
+const formatCertificateRequestStatus = (value) => CERTIFICATE_REQUEST_STATUS_FROM_DB[value] || value;
+
 module.exports = {
   buildRequestNumber,
   normalizeCertificateTypes,
   normalizeAttachments,
   formatCertificateRequestResponse,
+  normalizeCertificateRequestStatus,
+  formatCertificateRequestStatus,
 };

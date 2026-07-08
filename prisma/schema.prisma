@@ -13,6 +13,18 @@ enum CertificateStatus {
   Entregado
 }
 
+enum CertificateRequestStatus {
+  EnProceso
+  Observado
+  Recepcionado
+}
+
+enum AssemblyRecordRequestStatus {
+  EnProceso
+  PorRecoger
+  Entregado
+}
+
 enum TerrainMeasurementMode {
   RECTANGULAR_AUTO
   AREA_PERIMETER
@@ -39,6 +51,7 @@ model User {
   certificates          Certificate[]
   certificateRequests   CertificateRequest[]
   assemblyRecordRequest AssemblyRecordRequest[]
+  documentStatusHistory DocumentStatusHistory[]
 }
 
 model Role {
@@ -149,6 +162,7 @@ model CertificateRequest {
   exposure           String?
   attachments        Json?
   legacyPayload      Json?
+  status             CertificateRequestStatus @default(EnProceso)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
@@ -240,10 +254,26 @@ model AssemblyRecordRequest {
   phone         String?
   attachments   Json?
   legacyPayload Json?
+  status        AssemblyRecordRequestStatus @default(EnProceso)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   client      Client      @relation(fields: [clientId], references: [id])
   certificate Certificate @relation(fields: [certificateId], references: [id])
   user        User?       @relation(fields: [userId], references: [id])
+}
+
+model DocumentStatusHistory {
+  id              Int      @id @default(autoincrement())
+  documentType    String
+  documentId      Int
+  status          String
+  note            String?
+  changedByUserId Int?
+  changedAt       DateTime @default(now())
+
+  changedBy User? @relation(fields: [changedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([documentType, documentId, changedAt])
+  @@index([documentType, documentId, status])
 }

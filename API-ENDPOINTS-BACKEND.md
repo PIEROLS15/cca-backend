@@ -509,14 +509,15 @@ Example response:
       "certificateTypes": [
         { "type": "CertificadoPosesion" }
       ],
-      "exposure": "Solicito certificado de posesion.",
-      "attachments": [
-        { "type": "CopiaDni" }
-      ],
-      "createdBy": { "dni": "00000258", "role": "Atencion" },
-      "createdAt": "2026-05-18T20:35:20.000Z",
-      "updatedAt": "2026-05-18T20:35:20.000Z"
-    }
+       "exposure": "Solicito certificado de posesion.",
+       "attachments": [
+         { "type": "CopiaDni" }
+       ],
+       "status": "En Proceso",
+       "createdBy": { "dni": "00000258", "role": "Atencion" },
+       "createdAt": "2026-05-18T20:35:20.000Z",
+       "updatedAt": "2026-05-18T20:35:20.000Z"
+     }
   ],
   "total": 3803,
   "limit": 10,
@@ -534,7 +535,7 @@ Example response:
 Descarga el PDF de una solicitud.
 
 ### GET `/api/certificate-requests/:id`
-Devuelve una solicitud por ID o numero.
+Devuelve una solicitud por ID o numero, incluyendo `status`.
 
 ### GET `/api/certificate-requests/:id/delete-preview`
 Muestra el impacto de borrar la solicitud.
@@ -571,6 +572,7 @@ Body:
 
 ### PUT `/api/certificate-requests/:id`
 Actualiza una solicitud existente.
+Si el body incluye solo `status`, se permite el cambio rapido igual que en certificados.
 
 ### DELETE `/api/certificate-requests/:id`
 Borra una solicitud si no tiene certificados asociados.
@@ -748,6 +750,7 @@ Example response:
         "certificateNumber": "000001"
       },
       "description": "Solicitud de acta de asamblea",
+      "status": "En Proceso",
       "createdAt": "2026-05-18T20:35:20.000Z",
       "updatedAt": "2026-05-18T20:35:20.000Z"
     }
@@ -768,7 +771,7 @@ Example response:
 Descarga el PDF de una solicitud de acta.
 
 ### GET `/api/assembly-record-requests/:id`
-Devuelve una solicitud de acta por ID.
+Devuelve una solicitud de acta por ID, incluyendo `status`.
 
 ### GET `/api/assembly-record-requests/:id/preview`
 Genera un resumen rapido de la solicitud.
@@ -803,6 +806,7 @@ Body:
 
 ### PUT `/api/assembly-record-requests/:id`
 Actualiza una solicitud de acta.
+Si el body incluye solo `status`, se permite el cambio rapido igual que en certificados.
 
 ### DELETE `/api/assembly-record-requests/:id`
 Borra una solicitud de acta.
@@ -918,6 +922,46 @@ Example response:
       "west": "CALLE PRINCIPAL"
     },
     "createdAt": "2026-05-18T20:35:20.000Z"
+  }
+}
+```
+
+### GET `/api/public/tracking/:documentType/:code`
+Consulta un documento y devuelve su informacion basica, estado actual e historial.
+
+`documentType` admite alias como `certificado`, `solicitud-certificado`, `solicitud-de-certificado`, `acta`, `solicitud-acta`.
+
+Example response:
+```json
+{
+  "message": "Documento consultado correctamente",
+  "error": false,
+  "status": 200,
+  "data": {
+    "documentType": "certificate",
+    "title": "Certificado",
+    "code": "023665",
+    "currentStatus": "Por firmar",
+    "information": {
+      "people": [
+        {
+          "role": "Titular",
+          "fullName": "ACOSTA ALFARO, DIANA CLAUDIA",
+          "documentNumber": "43422119"
+        }
+      ],
+      "fields": [
+        { "label": "Ubicación", "value": "Santa Rosa Praderas" },
+        { "label": "Tipo de terreno", "value": "Vivienda" },
+        { "label": "Manzana", "value": "I-2" },
+        { "label": "Lote", "value": "5" }
+      ]
+    },
+    "history": [
+      { "status": "Por firmar", "date": "2026-05-15T17:07:00.000Z", "done": true },
+      { "status": "Por recoger", "date": null, "done": false },
+      { "status": "Entregado", "date": null, "done": false }
+    ]
   }
 }
 ```
