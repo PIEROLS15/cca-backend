@@ -40,7 +40,7 @@ const createAssemblyRecordRequest = asyncHandler(async (req, res) => {
 });
 
 const updateAssemblyRecordRequest = asyncHandler(async (req, res) => {
-  const request = await assemblyRecordRequestsService.updateAssemblyRecordRequest(Number(req.params.id), req.body);
+  const request = await assemblyRecordRequestsService.updateAssemblyRecordRequest(Number(req.params.id), req.body, req.user?.sub);
   res.json(request);
 });
 

@@ -11,6 +11,7 @@ const {
   normalizeCertificateRequestStatus,
 } = require("../utils/certificate-requests.utils");
 const clientsService = require("../../clients/services/clients.service");
+const { DOCUMENT_TYPES, recordDocumentStatusHistory } = require("../../../utils/document-status-history.utils");
 
 const requestIncludes = {
   client: { include: { commoner: true } },
@@ -141,6 +142,13 @@ const getCertificateRequestById = async (identifier) => {
 
   if (!request) {
     request = await prisma.certificateRequest.findFirst({
+      where: { requestNumber: identifier },
+      include: requestIncludes,
+    });
+  }
+
+  if (!request) {
+    request = await prisma.certificateRequest.findFirst({
       where: { requestNumber: { startsWith: identifier } },
       include: requestIncludes,
     });
@@ -246,11 +254,19 @@ const createCertificateRequest = async (payload, userId) => {
       include: requestIncludes,
     });
 
+    await recordDocumentStatusHistory(tx, {
+      documentType: DOCUMENT_TYPES.CERTIFICATE_REQUEST,
+      documentId: request.id,
+      status: request.status,
+      changedByUserId: creator?.id || null,
+      changedAt: request.createdAt,
+    });
+
     return formatCertificateRequestResponse(request);
   });
 };
 
-const updateCertificateRequest = async (id, payload) => {
+const updateCertificateRequest = async (id, payload, changedByUserId = null) => {
   const current = await prisma.certificateRequest.findUnique({
     where: { id },
     include: requestIncludes,
@@ -261,6 +277,7 @@ const updateCertificateRequest = async (id, payload) => {
   }
 
   const data = {};
+  let nextStatus = null;
 
   if (payload.client !== undefined) {
     const clientSnapshot = payload.client;
@@ -312,12 +329,26 @@ const updateCertificateRequest = async (id, payload) => {
       throw new HttpError(400, "Estado de solicitud de certificado invalido");
     }
     data.status = normalized;
+    nextStatus = normalized;
   }
 
-  const updated = await prisma.certificateRequest.update({
-    where: { id },
-    data,
-    include: requestIncludes,
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.certificateRequest.update({
+      where: { id },
+      data,
+      include: requestIncludes,
+    });
+
+    if (nextStatus && nextStatus !== current.status) {
+      await recordDocumentStatusHistory(tx, {
+        documentType: DOCUMENT_TYPES.CERTIFICATE_REQUEST,
+        documentId: id,
+        status: nextStatus,
+        changedByUserId,
+      });
+    }
+
+    return result;
   });
 
   return formatCertificateRequestResponse(updated);

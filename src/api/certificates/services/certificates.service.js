@@ -14,6 +14,7 @@ const { makeDeletionPreview, makeImpactItem } = require("../../../utils/deletion
 const {
   buildCertificateVerificationPayload,
 } = require("../utils/certificate-verification.utils");
+const { DOCUMENT_TYPES, recordDocumentStatusHistory } = require("../../../utils/document-status-history.utils");
 
 const certificateInclude = {
   client: true,
@@ -295,10 +296,18 @@ const createCertificate = async (payload, userId) => {
         west: payload.borders?.west || null,
         status: statusNormalized,
       },
-      select: { id: true },
+      select: { id: true, createdAt: true },
     });
 
     await syncCertificateOwners(tx, created.id, ownerIds);
+
+    await recordDocumentStatusHistory(tx, {
+      documentType: DOCUMENT_TYPES.CERTIFICATE,
+      documentId: created.id,
+      status: statusNormalized,
+      changedByUserId: userId,
+      changedAt: created.createdAt,
+    });
 
     const withOwners = await tx.certificate.findUnique({
       where: { id: created.id },
@@ -341,7 +350,7 @@ const getCertificateDeletePreview = async (id) => {
   });
 };
 
-const updateCertificate = async (id, payload) => {
+const updateCertificate = async (id, payload, changedByUserId = null) => {
   const existing = await prisma.certificate.findUnique({
     where: { id },
     include: certificateInclude,
@@ -354,6 +363,7 @@ const updateCertificate = async (id, payload) => {
   const data = {};
   const certificate = await prisma.$transaction(async (tx) => {
     let ownerIdsToSync = null;
+    let nextStatus = null;
 
     if (payload.owners) {
       ownerIdsToSync = (await resolveOwnerClients(tx, payload.owners)).map((owner) => owner.id);
@@ -462,6 +472,7 @@ const updateCertificate = async (id, payload) => {
         throw new HttpError(400, "Estado de certificado invalido");
       }
       data.status = normalized;
+      nextStatus = normalized;
     }
 
     if (Object.keys(data).length > 0) {
@@ -473,6 +484,15 @@ const updateCertificate = async (id, payload) => {
 
     if (ownerIdsToSync) {
       await syncCertificateOwners(tx, id, ownerIdsToSync);
+    }
+
+    if (nextStatus && nextStatus !== existing.status) {
+      await recordDocumentStatusHistory(tx, {
+        documentType: DOCUMENT_TYPES.CERTIFICATE,
+        documentId: id,
+        status: nextStatus,
+        changedByUserId,
+      });
     }
 
     return tx.certificate.findUnique({

@@ -51,6 +51,7 @@ model User {
   certificates          Certificate[]
   certificateRequests   CertificateRequest[]
   assemblyRecordRequest AssemblyRecordRequest[]
+  documentStatusHistory DocumentStatusHistory[]
 }
 
 model Role {
@@ -260,4 +261,19 @@ model AssemblyRecordRequest {
   client      Client      @relation(fields: [clientId], references: [id])
   certificate Certificate @relation(fields: [certificateId], references: [id])
   user        User?       @relation(fields: [userId], references: [id])
+}
+
+model DocumentStatusHistory {
+  id              Int      @id @default(autoincrement())
+  documentType    String
+  documentId      Int
+  status          String
+  note            String?
+  changedByUserId Int?
+  changedAt       DateTime @default(now())
+
+  changedBy User? @relation(fields: [changedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([documentType, documentId, changedAt])
+  @@index([documentType, documentId, status])
 }
