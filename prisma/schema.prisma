@@ -13,6 +13,18 @@ enum CertificateStatus {
   Entregado
 }
 
+enum CertificateRequestStatus {
+  EnProceso
+  Observado
+  Recepcionado
+}
+
+enum AssemblyRecordRequestStatus {
+  EnProceso
+  PorRecoger
+  Entregado
+}
+
 enum TerrainMeasurementMode {
   RECTANGULAR_AUTO
   AREA_PERIMETER
@@ -149,6 +161,7 @@ model CertificateRequest {
   exposure           String?
   attachments        Json?
   legacyPayload      Json?
+  status             CertificateRequestStatus @default(EnProceso)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
@@ -240,6 +253,7 @@ model AssemblyRecordRequest {
   phone         String?
   attachments   Json?
   legacyPayload Json?
+  status        AssemblyRecordRequestStatus @default(EnProceso)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 

@@ -6,6 +6,7 @@ const {
   buildAssemblyRequestCode,
   formatAssemblyRecordRequestResponse,
   normalizeAssemblyRecordAttachments,
+  normalizeAssemblyRecordRequestStatus,
 } = require("../utils/assembly-record-requests.utils");
 
 const buildAssemblyRecordRequestData = (payload = {}) => {
@@ -54,6 +55,14 @@ const buildAssemblyRecordRequestData = (payload = {}) => {
 
   if (payload.legacyPayload !== undefined) {
     data.legacyPayload = payload.legacyPayload;
+  }
+
+  if (payload.status !== undefined) {
+    const normalized = normalizeAssemblyRecordRequestStatus(payload.status);
+    if (!normalized) {
+      throw new HttpError(400, "Estado de solicitud de acta invalido");
+    }
+    data.status = normalized;
   }
 
   return data;

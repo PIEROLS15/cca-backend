@@ -8,6 +8,7 @@ const {
   normalizeCertificateTypes,
   normalizeAttachments,
   formatCertificateRequestResponse,
+  normalizeCertificateRequestStatus,
 } = require("../utils/certificate-requests.utils");
 const clientsService = require("../../clients/services/clients.service");
 
@@ -305,6 +306,13 @@ const updateCertificateRequest = async (id, payload) => {
   if (payload.exposure !== undefined) data.exposure = payload.exposure;
   if (payload.certificateTypes !== undefined) data.certificateTypes = normalizeCertificateTypes(payload.certificateTypes);
   if (payload.attachments !== undefined) data.attachments = normalizeAttachments(payload.attachments);
+  if (payload.status !== undefined) {
+    const normalized = normalizeCertificateRequestStatus(payload.status);
+    if (!normalized) {
+      throw new HttpError(400, "Estado de solicitud de certificado invalido");
+    }
+    data.status = normalized;
+  }
 
   const updated = await prisma.certificateRequest.update({
     where: { id },
