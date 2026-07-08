@@ -78,7 +78,6 @@ const formatCertificateResponse = (certificate) => {
       measurementModeUsed: certificate.measurementModeUsed,
     },
     legacyPayload: certificate.legacyPayload || null,
-    issuedSnapshot: certificate.issuedSnapshot || null,
     location: {
       sectors: certificate.sector
         ? { id: certificate.sector.id, name: certificate.sector.name }
