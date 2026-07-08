@@ -1,4 +1,3 @@
-const { randomUUID } = require("crypto");
 const { Prisma } = require("@prisma/client");
 const prisma = require("../../../config/prisma");
 const HttpError = require("../../../utils/http-error");
@@ -13,7 +12,6 @@ const {
 } = require("../utils/certificates.utils");
 const { makeDeletionPreview, makeImpactItem } = require("../../../utils/deletion-preview");
 const {
-  buildCertificateVerificationSnapshot,
   buildCertificateVerificationPayload,
 } = require("../utils/certificate-verification.utils");
 
@@ -218,34 +216,7 @@ const getCertificateById = async (id) => {
     throw new HttpError(404, "Certificado no encontrado");
   }
 
-  return formatCertificateResponse(await ensureCertificateVerificationData(certificate));
-};
-
-const ensureCertificateVerificationData = async (certificate) => {
-  if (!certificate) return certificate;
-
-  const updates = {};
-  if (!certificate.verificationToken) {
-    updates.verificationToken = randomUUID();
-  }
-
-  if (!certificate.issuedSnapshot) {
-    updates.issuedSnapshot = buildCertificateVerificationSnapshot(certificate);
-  }
-
-  if (Object.keys(updates).length === 0) {
-    return certificate;
-  }
-
-  await prisma.certificate.update({
-    where: { id: certificate.id },
-    data: updates,
-  });
-
-  return prisma.certificate.findUnique({
-    where: { id: certificate.id },
-    include: certificateInclude,
-  });
+  return formatCertificateResponse(certificate);
 };
 
 const createCertificate = async (payload, userId) => {
@@ -334,19 +305,13 @@ const createCertificate = async (payload, userId) => {
       include: certificateInclude,
     });
 
-    const snapshot = buildCertificateVerificationSnapshot(withOwners);
-    await tx.certificate.update({
-      where: { id: created.id },
-      data: { issuedSnapshot: snapshot },
-    });
-
     return tx.certificate.findUnique({
       where: { id: created.id },
       include: certificateInclude,
     });
   });
 
-  return formatCertificateResponse(await ensureCertificateVerificationData(certificate));
+  return formatCertificateResponse(certificate);
 };
 
 const getCertificateDeletePreview = async (id) => {
@@ -537,7 +502,7 @@ const getCertificateByNumber = async (certificateNumber) => {
     throw new HttpError(404, "Certificado no encontrado");
   }
 
-  return formatCertificateResponse(await ensureCertificateVerificationData(certificate));
+  return formatCertificateResponse(certificate);
 };
 
 const getCertificateVerificationByToken = async (token) => {
@@ -550,9 +515,7 @@ const getCertificateVerificationByToken = async (token) => {
     throw new HttpError(404, "Certificado no encontrado");
   }
 
-  const persisted = await ensureCertificateVerificationData(certificate);
-
-  return buildCertificateVerificationPayload(formatCertificateResponse(persisted));
+  return buildCertificateVerificationPayload(formatCertificateResponse(certificate));
 };
 
 module.exports = {
