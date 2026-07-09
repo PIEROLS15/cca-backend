@@ -93,6 +93,7 @@ const formatCertificateResponse = (certificate) => {
     },
     certificateNumber: certificate.certificateNumber,
     requestNumber: certificate.requestNumber || null,
+    additionalNotes: certificate.additionalNotes || null,
     status: formatCertificateStatus(certificate.status),
     createdBy: {
       dni: certificate.user?.dni || null,

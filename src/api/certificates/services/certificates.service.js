@@ -16,6 +16,8 @@ const {
 } = require("../utils/certificate-verification.utils");
 const { DOCUMENT_TYPES, recordDocumentStatusHistory } = require("../../../utils/document-status-history.utils");
 
+const MAX_ADDITIONAL_NOTES_LENGTH = 120;
+
 const certificateInclude = {
   client: true,
   partner: true,
@@ -45,6 +47,8 @@ const normalizeComparableName = (value) => String(value || "")
   .toLowerCase();
 
 const normalizeDocumentNumber = (value) => String(value || "").replace(/\D/g, "").trim();
+
+const normalizeAdditionalNotes = (value) => String(value || "").trim();
 
 const syncCertificateOwners = async (tx, certificateId, ownerIds) => {
   await tx.certificateOwner.deleteMany({ where: { certificateId } });
@@ -257,6 +261,11 @@ const createCertificate = async (payload, userId) => {
     if (!sectorId) {
       throw new HttpError(400, "location.sectors.id es obligatorio");
     }
+
+    const additionalNotes = normalizeAdditionalNotes(payload.additionalNotes);
+    if (additionalNotes.length > MAX_ADDITIONAL_NOTES_LENGTH) {
+      throw new HttpError(400, `Las notas adicionales no pueden superar ${MAX_ADDITIONAL_NOTES_LENGTH} caracteres`);
+    }
     if (!(await tx.sector.findUnique({ where: { id: sectorId } }))) {
       throw new HttpError(404, "Sector no encontrado");
     }
@@ -294,6 +303,7 @@ const createCertificate = async (payload, userId) => {
         south: payload.borders?.south || null,
         east: payload.borders?.east || null,
         west: payload.borders?.west || null,
+        additionalNotes: additionalNotes || null,
         status: statusNormalized,
       },
       select: { id: true, createdAt: true },
@@ -456,6 +466,14 @@ const updateCertificate = async (id, payload, changedByUserId = null) => {
       if ("south" in payload.borders) data.south = payload.borders.south ?? null;
       if ("east" in payload.borders) data.east = payload.borders.east ?? null;
       if ("west" in payload.borders) data.west = payload.borders.west ?? null;
+    }
+
+    if (payload.additionalNotes !== undefined) {
+      const additionalNotes = normalizeAdditionalNotes(payload.additionalNotes);
+      if (additionalNotes.length > MAX_ADDITIONAL_NOTES_LENGTH) {
+        throw new HttpError(400, `Las notas adicionales no pueden superar ${MAX_ADDITIONAL_NOTES_LENGTH} caracteres`);
+      }
+      data.additionalNotes = additionalNotes || null;
     }
 
     if (payload.requestNumber !== undefined) {
