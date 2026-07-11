@@ -77,8 +77,22 @@ const documentLoaders = {
   },
   assembly_record_request: {
     historyType: DOCUMENT_TYPES.ASSEMBLY_RECORD_REQUEST,
-    load: (code) => assemblyRecordRequestsService.getAssemblyRecordRequestByCode(code),
-    codeField: "code",
+    load: async (code) => {
+      const certificate = await certificatesService.getCertificateByNumber(code);
+      if (!certificate) return null;
+
+      const request = await prisma.assemblyRecordRequest.findFirst({
+        where: { certificateId: certificate.id },
+        include: {
+          client: { include: { commoner: true } },
+          certificate: { include: { sector: true, terrainType: true } },
+          user: true,
+        },
+      });
+
+      return request || null;
+    },
+    getCode: (doc) => doc.certificate?.certificateNumber || doc.code,
     buildInformation: (document) => ({
       people: [
         {
@@ -125,10 +139,14 @@ const getDocumentTrackingByTypeAndCode = async (documentType, code) => {
     orderBy: [{ changedAt: "asc" }, { id: "asc" }],
   });
 
+  const getCode = loader.getCode || ((doc) => doc[loader.codeField]);
+  const docCode = getCode(document);
+
   return buildTrackingResponse({
     documentType: normalizedType,
-    code: document[loader.codeField],
+    code: docCode,
     currentStatus: document.status,
+    createdAt: document.createdAt,
     information: loader.buildInformation(document),
     historyRows,
   });

@@ -1,5 +1,23 @@
 const { normalizeComparableText } = require("../../certificate-requests/utils/certificate-request-legacy.utils");
 
+const LIMA_TIME_ZONE = "America/Lima";
+const LIMA_OFFSET_MINUTES = -5 * 60;
+
+const formatDateTimeInLima = (value) => {
+  if (!value) return null;
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const limaDate = new Date(date.getTime() + (LIMA_OFFSET_MINUTES * 60 * 1000));
+  const pad = (n) => String(n).padStart(2, "0");
+
+  return [
+    `${limaDate.getUTCFullYear()}-${pad(limaDate.getUTCMonth() + 1)}-${pad(limaDate.getUTCDate())}`,
+    `${pad(limaDate.getUTCHours())}:${pad(limaDate.getUTCMinutes())}:${pad(limaDate.getUTCSeconds())}-05:00`,
+  ].join("T");
+};
+
 const CERTIFICATE_TYPES = [
   { key: "PorFirmar", label: "Por firmar" },
   { key: "PorRecoger", label: "Por recoger" },
@@ -56,23 +74,27 @@ const formatCertificateRequestTypes = (types = []) => (Array.isArray(types) ? ty
   .filter(Boolean)
   .join(", ");
 
-const buildTrackingTimeline = ({ documentType, currentStatus, historyRows = [] }) => {
+const buildTrackingTimeline = ({ documentType, currentStatus, createdAt = null, historyRows = [] }) => {
   const steps = DOCUMENT_TYPE_CONFIG[documentType]?.history || [];
   const labelByStatus = HISTORY_LABEL_BY_TYPE[documentType] || {};
   const currentIndex = steps.findIndex((step) => normalizeComparableText(step.label) === normalizeComparableText(currentStatus));
   const historyByStatus = new Map();
 
   for (const row of historyRows) {
-    if (!historyByStatus.has(row.status)) {
-      historyByStatus.set(row.status, row.changedAt);
-    }
+    historyByStatus.set(row.status, row.changedAt);
   }
 
-  return steps.map((step, index) => ({
-    status: labelByStatus[step.key] || step.label,
-    date: historyByStatus.get(step.key) || null,
-    done: currentIndex >= 0 ? index <= currentIndex : historyByStatus.has(step.key),
-  }));
+  return steps.map((step, index) => {
+    const isDone = currentIndex >= 0 ? index <= currentIndex : historyByStatus.has(step.key);
+    const statusDate = index === 0
+      ? createdAt
+      : historyByStatus.get(step.key) || null;
+    return {
+      status: labelByStatus[step.key] || step.label,
+      date: isDone ? formatDateTimeInLima(statusDate) : null,
+      done: isDone,
+    };
+  });
 };
 
 const normalizeCurrentStatusLabel = (documentType, currentStatus) => {
@@ -85,6 +107,7 @@ const buildTrackingResponse = ({
   documentType,
   code,
   currentStatus,
+  createdAt,
   information,
   historyRows,
 }) => {
@@ -103,7 +126,7 @@ const buildTrackingResponse = ({
       people: buildPeople(information.people),
       fields: buildFields(information.fields),
     },
-    history: buildTrackingTimeline({ documentType, currentStatus, historyRows }),
+    history: buildTrackingTimeline({ documentType, currentStatus, createdAt, historyRows }),
   };
 };
 
