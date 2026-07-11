@@ -68,11 +68,14 @@ const buildTrackingTimeline = ({ documentType, currentStatus, historyRows = [] }
     }
   }
 
-  return steps.map((step, index) => ({
-    status: labelByStatus[step.key] || step.label,
-    date: historyByStatus.get(step.key) || null,
-    done: currentIndex >= 0 ? index <= currentIndex : historyByStatus.has(step.key),
-  }));
+  return steps.map((step, index) => {
+    const isDone = currentIndex >= 0 ? index <= currentIndex : historyByStatus.has(step.key);
+    return {
+      status: labelByStatus[step.key] || step.label,
+      date: isDone ? (historyByStatus.get(step.key) || null) : null,
+      done: isDone,
+    };
+  });
 };
 
 const normalizeCurrentStatusLabel = (documentType, currentStatus) => {
