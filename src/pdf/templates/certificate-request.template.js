@@ -186,10 +186,10 @@ const buildCertificateRequestTemplatePdf = async (request) => {
 
       const partnerLine =
         partner.fullName || partner.documentNumber
-          ? ` Casado(a) o conviviente con ${toUpperDisplay(partner.fullName)}, DNI: ${toUpperDisplay(partner.documentNumber)}`
+          ? ` Casado(a) o conviviente con ${toUpperDisplay(partner.fullName)}, DNI / CÓDIGO: ${toUpperDisplay(partner.documentNumber)}`
           : "";
 
-      const intro = `Yo, ${toUpperDisplay(client.fullName)}, identificado con DNI N° ${toUpperDisplay(client.documentNumber)}, domiciliado en el anexo ${toUpperDisplay(client.address)}.${partnerLine}`;
+      const intro = `Yo, ${toUpperDisplay(client.fullName)}, identificado con DNI / CÓDIGO N° ${toUpperDisplay(client.documentNumber)}, domiciliado en el anexo ${toUpperDisplay(client.address)}.${partnerLine}`;
       doc.text(intro, 52, doc.y, { width: 470, align: "justify", lineGap: 0 });
       doc.moveDown(1.2);
 
@@ -219,7 +219,7 @@ const buildCertificateRequestTemplatePdf = async (request) => {
         lineGap: 0,
       });
       doc.moveDown(0.08);
-      doc.text(`DNI: ${toUpperDisplay(client.documentNumber)}`, 52, doc.y, {
+      doc.text(`DNI / CÓDIGO: ${toUpperDisplay(client.documentNumber)}`, 52, doc.y, {
         width: 492,
         align: "center",
         lineGap: 0,

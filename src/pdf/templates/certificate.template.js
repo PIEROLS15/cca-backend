@@ -191,7 +191,7 @@ const buildCertificatePdf = async (certificate) => {
       });
 
       doc.font("Times-Roman").fontSize(12);
-      doc.text("IDENTIFICADO CON DNI N° ", leftMargin, doc.y + 10, { continued: true });
+      doc.text("IDENTIFICADO CON DNI / CÓDIGO N° ", leftMargin, doc.y + 10, { continued: true });
       doc.font("Times-Bold").text(ownerDocs || "");
 
       const green2Y = doc.y + 20;

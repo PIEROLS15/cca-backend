@@ -2,6 +2,8 @@ const HttpError = require("../../../utils/http-error");
 const { getRoleGroup } = require("../../../utils/access-control.utils");
 
 const LICENSE_NUMBER_LENGTH = 4;
+const CLIENT_CODE_PREFIX = "CLI-";
+const CLIENT_CODE_PADDING = 3;
 
 const normalizeString = (value) => {
   if (value === undefined) {
@@ -39,6 +41,31 @@ const formatLicenseNumber = (licenseSequence) => {
   return String(licenseSequence).padStart(LICENSE_NUMBER_LENGTH, "0");
 };
 
+const formatClientCode = (sequence) => {
+  if (sequence == null) {
+    return null;
+  }
+
+  return `${CLIENT_CODE_PREFIX}${String(sequence).padStart(CLIENT_CODE_PADDING, "0")}`;
+};
+
+const parseClientCodeNumber = (clientCode) => {
+  const match = String(clientCode || "").trim().match(/^CLI-(\d+)$/i);
+  return match ? Number(match[1]) : null;
+};
+
+const getNextClientCodeSequence = async (tx) => {
+  const clients = await tx.client.findMany({
+    where: { clientCode: { not: null } },
+    select: { clientCode: true },
+  });
+
+  return clients.reduce((max, client) => {
+    const parsed = parseClientCodeNumber(client.clientCode);
+    return parsed != null && parsed > max ? parsed : max;
+  }, 0) + 1;
+};
+
 const normalizeLicenseSequenceInput = (value) => {
   if (value === undefined) {
     return undefined;
@@ -58,10 +85,13 @@ const normalizeLicenseSequenceInput = (value) => {
 
 const normalizeClientPayload = (payload = {}, currentClient = null) => ({
   fullName: hasOwn(payload, "fullName") ? normalizeString(payload.fullName) : currentClient?.fullName,
-  documentNumber: hasOwn(payload, "documentNumber") ? normalizeString(payload.documentNumber) : currentClient?.documentNumber,
+  documentNumber: hasOwn(payload, "documentNumber") ? normalizeOptionalString(payload.documentNumber) : currentClient?.documentNumber ?? null,
   address: hasOwn(payload, "address") ? normalizeOptionalString(payload.address) : currentClient?.address ?? null,
   phone: hasOwn(payload, "phone") ? normalizeOptionalString(payload.phone) : currentClient?.phone ?? null,
   isComunero: hasOwn(payload, "isComunero") ? Boolean(payload.isComunero) : currentClient?.commoner != null,
+  noDocument: hasOwn(payload, "noDocument")
+    ? Boolean(payload.noDocument)
+    : currentClient?.documentNumber == null,
   licenseSequence: hasOwn(payload, "licenseSequence") ? normalizeLicenseSequenceInput(payload.licenseSequence) : undefined,
 });
 
@@ -162,11 +192,18 @@ const resolveCommonerWrite = async (tx, clientData, data, currentClient, actorRo
 
 const buildClientWriteData = async (tx, payload = {}, currentClient = null) => {
   const data = normalizeClientPayload(payload, currentClient);
-  const { isComunero, licenseSequence, ...clientData } = data;
+  const { isComunero, noDocument, licenseSequence, ...clientData } = data;
 
   clientData.isComunero = isComunero;
   if (licenseSequence !== undefined) {
     clientData.licenseSequence = licenseSequence;
+  }
+
+  if (noDocument) {
+    clientData.documentNumber = null;
+    clientData.clientCode = currentClient?.clientCode ?? formatClientCode(await getNextClientCodeSequence(tx));
+  } else {
+    clientData.clientCode = currentClient?.clientCode ?? null;
   }
 
   await resolveCommonerWrite(tx, clientData, data, currentClient, payload.actorRoleName || null);
@@ -186,6 +223,7 @@ const formatClientResponse = (client) => {
     clientType: commoner?.isActive ? "Comunero" : "Tercero",
     nro_licence: commoner?.licenseSequence != null ? formatLicenseNumber(commoner.licenseSequence) : null,
     licenseSequence: commoner?.licenseSequence ?? null,
+    clientCode: rest.clientCode ?? null,
   };
 };
 
@@ -196,6 +234,8 @@ module.exports = {
   formatClientCollection,
   formatClientResponse,
   formatLicenseNumber,
+  formatClientCode,
+  getNextClientCodeSequence,
   getNextLicenseSequence,
   normalizeClientPayload,
   normalizeLicenseSequenceInput,

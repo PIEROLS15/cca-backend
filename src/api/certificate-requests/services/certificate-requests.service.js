@@ -102,6 +102,7 @@ const listCertificateRequests = async ({ page, limit, search }) => {
           OR: [
             { fullName: { contains: search, mode: "insensitive" } },
             { documentNumber: { contains: search, mode: "insensitive" } },
+            { clientCode: { contains: search, mode: "insensitive" } },
           ],
         },
       },
