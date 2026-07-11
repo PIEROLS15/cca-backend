@@ -146,6 +146,7 @@ const getDocumentTrackingByTypeAndCode = async (documentType, code) => {
     documentType: normalizedType,
     code: docCode,
     currentStatus: document.status,
+    createdAt: document.createdAt,
     information: loader.buildInformation(document),
     historyRows,
   });
