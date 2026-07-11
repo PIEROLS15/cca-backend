@@ -284,6 +284,11 @@ Healthcheck:
 GET /health
 ```
 
+Tambien puedes usar `GET /api/health` por compatibilidad con los frontends.
+
+En produccion, si compartes la cookie de sesion entre `comunidadcampesina-asia.com` y
+`seguimiento.comunidadcampesina-asia.com`, define `COOKIE_DOMAIN=comunidadcampesina-asia.com`.
+
 ---
 
 ## Scripts disponibles

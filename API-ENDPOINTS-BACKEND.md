@@ -3,10 +3,10 @@
 ## Base
 - Local: `http://localhost:9001`
 - Prefix: `/api`
-- Health: `GET /health`
+- Health: `GET /health` o `GET /api/health`
 
 ## Auth
-Todos los endpoints, salvo `/health` y `/api/auth/login`, requieren autenticacion.
+Todos los endpoints, salvo `/health`, `/api/health` y `/api/auth/login`, requieren autenticacion.
 El login crea una cookie httpOnly `token` y tambien puedes usar `Authorization: Bearer <token>`.
 
 ### POST `/api/auth/login`

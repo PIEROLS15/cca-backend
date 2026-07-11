@@ -21,6 +21,10 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
 app.use("/api", apiRouter);
 
 app.use(notFoundHandler);
