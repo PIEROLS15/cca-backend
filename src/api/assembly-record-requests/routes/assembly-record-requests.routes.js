@@ -5,7 +5,19 @@ const { requireModuleAccess } = require("../../../middlewares/module-access.midd
 
 const router = express.Router();
 
-router.use(authRequired, requireModuleAccess("assembly-record-requests"));
+const requireAssemblyRecordRequestWriteAccess = requireModuleAccess("assembly-record-requests");
+const requireAssemblyRecordRequestStatusUpdateAccess = (req, res, next) => {
+  if (req.user?.roleGroup === 4) {
+    const bodyKeys = Object.keys(req.body || {});
+    if (bodyKeys.length === 1 && bodyKeys.includes("status")) {
+      return next();
+    }
+  }
+
+  return requireAssemblyRecordRequestWriteAccess(req, res, next);
+};
+
+router.use(authRequired, requireModuleAccess("assembly-record-requests", { readOnlyGroups: [4] }));
 
 router.get("/", assemblyRecordRequestsController.listAssemblyRecordRequests);
 router.get("/download/:filename", assemblyRecordRequestsController.downloadAssemblyRecordRequestPdfByFilename);
@@ -14,7 +26,7 @@ router.get("/:id", assemblyRecordRequestsController.getAssemblyRecordRequestById
 router.get("/:id/preview", assemblyRecordRequestsController.previewAssemblyRecordRequest);
 router.get("/:id/pdf", assemblyRecordRequestsController.downloadAssemblyRecordRequestPdf);
 router.post("/", assemblyRecordRequestsController.createAssemblyRecordRequest);
-router.put("/:id", assemblyRecordRequestsController.updateAssemblyRecordRequest);
+router.put("/:id", requireAssemblyRecordRequestStatusUpdateAccess, assemblyRecordRequestsController.updateAssemblyRecordRequest);
 router.delete("/:id", assemblyRecordRequestsController.deleteAssemblyRecordRequest);
 
 module.exports = router;

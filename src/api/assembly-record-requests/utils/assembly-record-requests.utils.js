@@ -1,5 +1,19 @@
 const { normalizeComparableText } = require("../../certificate-requests/utils/certificate-request-legacy.utils");
 
+const ASSEMBLY_RECORD_REQUEST_STATUS_TO_DB = {
+  "En Proceso": "EnProceso",
+  EnProceso: "EnProceso",
+  "Por Recoger": "PorRecoger",
+  PorRecoger: "PorRecoger",
+  Entregado: "Entregado",
+};
+
+const ASSEMBLY_RECORD_REQUEST_STATUS_FROM_DB = {
+  EnProceso: "En Proceso",
+  PorRecoger: "Por Recoger",
+  Entregado: "Entregado",
+};
+
 const buildAssemblyRequestCode = (sequence) => `SOL-ACTA-${String(sequence).padStart(6, "0")}`;
 
 const LEGACY_ATTACHMENT_LABELS = [
@@ -179,8 +193,13 @@ const formatAssemblyRecordRequestResponse = (request) => {
     },
     user: user?.id ? { id: user.id, fullName: user.fullName || "" } : null,
     legacyPayload,
+    status: ASSEMBLY_RECORD_REQUEST_STATUS_FROM_DB[request.status] || request.status || "En Proceso",
   };
 };
+
+const normalizeAssemblyRecordRequestStatus = (value) => ASSEMBLY_RECORD_REQUEST_STATUS_TO_DB[value] || null;
+
+const formatAssemblyRecordRequestStatus = (value) => ASSEMBLY_RECORD_REQUEST_STATUS_FROM_DB[value] || value;
 
 module.exports = {
   buildAssemblyRequestCode,
@@ -188,4 +207,6 @@ module.exports = {
   normalizeAssemblyRecordAttachments,
   normalizeAssemblyRecordAttachmentLabel,
   normalizeAssemblyRecordLegacyAttachments,
+  normalizeAssemblyRecordRequestStatus,
+  formatAssemblyRecordRequestStatus,
 };

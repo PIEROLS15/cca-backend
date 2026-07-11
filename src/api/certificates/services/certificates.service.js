@@ -14,6 +14,9 @@ const { makeDeletionPreview, makeImpactItem } = require("../../../utils/deletion
 const {
   buildCertificateVerificationPayload,
 } = require("../utils/certificate-verification.utils");
+const { DOCUMENT_TYPES, recordDocumentStatusHistory } = require("../../../utils/document-status-history.utils");
+
+const MAX_ADDITIONAL_NOTES_LENGTH = 120;
 
 const certificateInclude = {
   client: true,
@@ -44,6 +47,8 @@ const normalizeComparableName = (value) => String(value || "")
   .toLowerCase();
 
 const normalizeDocumentNumber = (value) => String(value || "").replace(/\D/g, "").trim();
+
+const normalizeAdditionalNotes = (value) => String(value || "").trim();
 
 const syncCertificateOwners = async (tx, certificateId, ownerIds) => {
   await tx.certificateOwner.deleteMany({ where: { certificateId } });
@@ -256,6 +261,11 @@ const createCertificate = async (payload, userId) => {
     if (!sectorId) {
       throw new HttpError(400, "location.sectors.id es obligatorio");
     }
+
+    const additionalNotes = normalizeAdditionalNotes(payload.additionalNotes);
+    if (additionalNotes.length > MAX_ADDITIONAL_NOTES_LENGTH) {
+      throw new HttpError(400, `Las notas adicionales no pueden superar ${MAX_ADDITIONAL_NOTES_LENGTH} caracteres`);
+    }
     if (!(await tx.sector.findUnique({ where: { id: sectorId } }))) {
       throw new HttpError(404, "Sector no encontrado");
     }
@@ -293,12 +303,21 @@ const createCertificate = async (payload, userId) => {
         south: payload.borders?.south || null,
         east: payload.borders?.east || null,
         west: payload.borders?.west || null,
+        additionalNotes: additionalNotes || null,
         status: statusNormalized,
       },
-      select: { id: true },
+      select: { id: true, createdAt: true },
     });
 
     await syncCertificateOwners(tx, created.id, ownerIds);
+
+    await recordDocumentStatusHistory(tx, {
+      documentType: DOCUMENT_TYPES.CERTIFICATE,
+      documentId: created.id,
+      status: statusNormalized,
+      changedByUserId: userId,
+      changedAt: created.createdAt,
+    });
 
     const withOwners = await tx.certificate.findUnique({
       where: { id: created.id },
@@ -341,7 +360,7 @@ const getCertificateDeletePreview = async (id) => {
   });
 };
 
-const updateCertificate = async (id, payload) => {
+const updateCertificate = async (id, payload, changedByUserId = null) => {
   const existing = await prisma.certificate.findUnique({
     where: { id },
     include: certificateInclude,
@@ -354,6 +373,7 @@ const updateCertificate = async (id, payload) => {
   const data = {};
   const certificate = await prisma.$transaction(async (tx) => {
     let ownerIdsToSync = null;
+    let nextStatus = null;
 
     if (payload.owners) {
       ownerIdsToSync = (await resolveOwnerClients(tx, payload.owners)).map((owner) => owner.id);
@@ -448,6 +468,14 @@ const updateCertificate = async (id, payload) => {
       if ("west" in payload.borders) data.west = payload.borders.west ?? null;
     }
 
+    if (payload.additionalNotes !== undefined) {
+      const additionalNotes = normalizeAdditionalNotes(payload.additionalNotes);
+      if (additionalNotes.length > MAX_ADDITIONAL_NOTES_LENGTH) {
+        throw new HttpError(400, `Las notas adicionales no pueden superar ${MAX_ADDITIONAL_NOTES_LENGTH} caracteres`);
+      }
+      data.additionalNotes = additionalNotes || null;
+    }
+
     if (payload.requestNumber !== undefined) {
       data.requestNumber = payload.requestNumber || "";
     }
@@ -462,6 +490,7 @@ const updateCertificate = async (id, payload) => {
         throw new HttpError(400, "Estado de certificado invalido");
       }
       data.status = normalized;
+      nextStatus = normalized;
     }
 
     if (Object.keys(data).length > 0) {
@@ -473,6 +502,15 @@ const updateCertificate = async (id, payload) => {
 
     if (ownerIdsToSync) {
       await syncCertificateOwners(tx, id, ownerIdsToSync);
+    }
+
+    if (nextStatus && nextStatus !== existing.status) {
+      await recordDocumentStatusHistory(tx, {
+        documentType: DOCUMENT_TYPES.CERTIFICATE,
+        documentId: id,
+        status: nextStatus,
+        changedByUserId,
+      });
     }
 
     return tx.certificate.findUnique({
