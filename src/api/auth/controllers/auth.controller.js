@@ -14,9 +14,21 @@ function getAuthCookieOptions({ includeMaxAge = true } = {}) {
     options.maxAge = 8 * 60 * 60 * 1000;
   }
 
+  const cookieDomain = process.env.COOKIE_DOMAIN;
+
+  if (cookieDomain) {
+    const normalizedDomain = cookieDomain.trim().replace(/^\./, "");
+
+    if (!normalizedDomain.includes(",") && !normalizedDomain.includes(":") && !normalizedDomain.includes("//")) {
+      options.domain = normalizedDomain;
+    }
+
+    return options;
+  }
+
   const frontendUrl = process.env.FRONTEND_URL;
 
-  if (!frontendUrl) return options;
+  if (!frontendUrl || frontendUrl.includes(",")) return options;
 
   try {
     const hostname = new URL(frontendUrl).hostname;
