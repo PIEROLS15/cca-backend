@@ -40,6 +40,14 @@ const resolveIsComunero = (body) => {
   return undefined;
 };
 
+const resolveNoDocument = (body) => {
+  if (body.noDocument !== undefined) {
+    return parseBooleanLike(body.noDocument);
+  }
+
+  return false;
+};
+
 const listClients = asyncHandler(async (req, res) => {
   const data = await clientsService.listClients({
     clientType: req.query.clientType,
@@ -62,23 +70,32 @@ const getClientById = asyncHandler(async (req, res) => {
 const createClient = asyncHandler(async (req, res) => {
   const { fullName, documentNumber } = req.body;
   const resolvedIsComunero = resolveIsComunero(req.body);
+  const noDocument = resolveNoDocument(req.body);
 
-  if (!fullName || !documentNumber || resolvedIsComunero === undefined) {
+  if (!fullName || resolvedIsComunero === undefined || (!noDocument && !documentNumber)) {
     throw new HttpError(400, "Completa los campos obligatorios para registrar el cliente");
   }
 
   const client = await clientsService.createClient({
     ...req.body,
     isComunero: resolvedIsComunero,
+    noDocument,
   }, req.user?.role);
   res.status(201).json(client);
 });
 
 const updateClient = asyncHandler(async (req, res) => {
   const resolvedIsComunero = resolveIsComunero(req.body);
+  const noDocument = resolveNoDocument(req.body);
   const payload = resolvedIsComunero === undefined
     ? req.body
     : { ...req.body, isComunero: resolvedIsComunero };
+
+  payload.noDocument = noDocument;
+
+  if (!noDocument && !String(payload.documentNumber || "").trim()) {
+    throw new HttpError(400, "Completa los campos obligatorios para registrar el cliente");
+  }
 
   const client = await clientsService.updateClient(Number(req.params.id), payload, req.user?.role);
   res.json(client);

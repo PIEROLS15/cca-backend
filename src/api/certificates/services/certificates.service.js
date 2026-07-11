@@ -35,7 +35,7 @@ const normalizeOwnerEntries = (owners = []) => owners
   .map((owner) => ({
     id: Number(owner?.id) || null,
     fullName: String(owner?.fullName || "").trim(),
-    documentNumber: String(owner?.documentNumber || "").replace(/\D/g, "").trim(),
+    documentNumber: String(owner?.documentNumber || "").trim().toUpperCase(),
   }))
   .filter((owner) => owner.id || owner.documentNumber || owner.fullName);
 
@@ -46,7 +46,7 @@ const normalizeComparableName = (value) => String(value || "")
   .trim()
   .toLowerCase();
 
-const normalizeDocumentNumber = (value) => String(value || "").replace(/\D/g, "").trim();
+const normalizeOwnerIdentifier = (value) => String(value || "").trim().toUpperCase();
 
 const normalizeAdditionalNotes = (value) => String(value || "").trim();
 
@@ -133,26 +133,31 @@ const resolveOwnerClients = async (tx, owners = []) => {
   const seen = new Set();
 
   for (const owner of ownerEntries) {
-    const documentNumber = normalizeDocumentNumber(owner.documentNumber);
+    const identifier = normalizeOwnerIdentifier(owner.documentNumber);
     const fullName = String(owner.fullName || "").trim();
 
-    if (!documentNumber) {
-      throw new HttpError(400, "Cada dueño debe tener DNI");
+    if (!identifier) {
+      throw new HttpError(400, "Cada dueño debe tener DNI o código");
     }
 
     if (!fullName) {
-      throw new HttpError(400, "Cada dueño debe tener nombres y DNI");
+      throw new HttpError(400, "Cada dueño debe tener nombres y documento");
     }
 
-    let client = await tx.client.findUnique({
-      where: { documentNumber },
-      select: { id: true, fullName: true, documentNumber: true },
+    let client = await tx.client.findFirst({
+      where: {
+        OR: [
+          { documentNumber: identifier },
+          { clientCode: identifier },
+        ],
+      },
+      select: { id: true, fullName: true, documentNumber: true, clientCode: true },
     });
 
     if (!client && owner.id) {
       client = await tx.client.findUnique({
         where: { id: owner.id },
-        select: { id: true, fullName: true, documentNumber: true },
+        select: { id: true, fullName: true, documentNumber: true, clientCode: true },
       });
     }
 
@@ -161,18 +166,19 @@ const resolveOwnerClients = async (tx, owners = []) => {
         client = await tx.client.update({
           where: { id: client.id },
           data: { fullName },
-          select: { id: true, fullName: true, documentNumber: true },
+          select: { id: true, fullName: true, documentNumber: true, clientCode: true },
         });
       }
     } else {
       client = await tx.client.create({
         data: {
           fullName,
-          documentNumber,
+          documentNumber: /^CLI-\d+$/i.test(identifier) ? null : identifier,
+          clientCode: /^CLI-\d+$/i.test(identifier) ? identifier : null,
           address: null,
           phone: null,
         },
-        select: { id: true, fullName: true, documentNumber: true },
+        select: { id: true, fullName: true, documentNumber: true, clientCode: true },
       });
     }
 

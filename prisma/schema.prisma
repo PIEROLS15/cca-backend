@@ -123,7 +123,8 @@ model TerrainType {
 model Client {
   id             Int      @id @default(autoincrement())
   fullName       String
-  documentNumber String   @unique
+  documentNumber String?  @unique
+  clientCode     String?  @unique
   address        String?
   phone          String?
   createdAt      DateTime @default(now())

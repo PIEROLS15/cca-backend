@@ -43,15 +43,15 @@ const formatCertificateResponse = (certificate) => {
     ? certificate.owners.map((owner) => ({
         id: owner.client?.id || null,
         fullName: owner.client?.fullName || "",
-        documentNumber: owner.client?.documentNumber || "",
+        documentNumber: owner.client?.documentNumber || owner.client?.clientCode || "",
         order: owner.order,
         source: owner.source || null,
       }))
     : [];
 
   if (owners.length === 0) {
-    if (certificate.client) owners.push({ id: certificate.client.id, fullName: certificate.client.fullName, documentNumber: certificate.client.documentNumber, order: 1, source: "certificate.client" });
-    if (certificate.partner) owners.push({ id: certificate.partner.id, fullName: certificate.partner.fullName, documentNumber: certificate.partner.documentNumber, order: 2, source: "certificate.partner" });
+    if (certificate.client) owners.push({ id: certificate.client.id, fullName: certificate.client.fullName, documentNumber: certificate.client.documentNumber || certificate.client.clientCode || "", order: 1, source: "certificate.client" });
+    if (certificate.partner) owners.push({ id: certificate.partner.id, fullName: certificate.partner.fullName, documentNumber: certificate.partner.documentNumber || certificate.partner.clientCode || "", order: 2, source: "certificate.partner" });
   }
 
   return {
@@ -145,6 +145,7 @@ const buildCertificateFilters = (query) => {
       OR: [
         { fullName: { contains: s, mode: "insensitive" } },
         { documentNumber: { contains: s, mode: "insensitive" } },
+        { clientCode: { contains: s, mode: "insensitive" } },
       ],
     };
     where.AND = [
@@ -165,6 +166,7 @@ const buildCertificateFilters = (query) => {
     const clientConditions = [];
     if (query.name) clientConditions.push({ fullName: { contains: query.name, mode: "insensitive" } });
     if (query.documentNumber) clientConditions.push({ documentNumber: { contains: query.documentNumber, mode: "insensitive" } });
+    if (query.documentNumber) clientConditions.push({ clientCode: { contains: query.documentNumber, mode: "insensitive" } });
     const clientFilter = clientConditions.length > 0 ? { AND: clientConditions } : undefined;
 
     const existingAND = where.AND || [];
