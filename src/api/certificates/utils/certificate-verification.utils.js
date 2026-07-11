@@ -33,6 +33,7 @@ const buildCertificateSnapshot = (certificate) => ({
   additionalLength: toNumber(certificate.terrain?.additionalLength),
   mz: normalizeText(certificate.location?.mz) || null,
   lot: normalizeText(certificate.location?.lot) || null,
+  additionalNotes: normalizeText(certificate.additionalNotes) || null,
   createdAt: normalizeDateText(certificate.createdAt),
   borders: {
     north: normalizeText(certificate.borders?.north) || null,

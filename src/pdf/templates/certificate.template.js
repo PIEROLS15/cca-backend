@@ -121,7 +121,7 @@ const renderTextSegments = (doc, segments, x, y, options = {}) => {
   });
 };
 
-const drawCodeGrid = (doc, code) => {
+const drawCodeGrid = (doc, code, startY) => {
   const fontSize = 15;
   const baseX = 50;
   const indentX = 58;
@@ -129,7 +129,7 @@ const drawCodeGrid = (doc, code) => {
   const stepY = 18;
   const cols = 4;
 
-  doc.fontSize(fontSize).fillColor("#b7c8ef");
+  doc.font("Times-Roman").fontSize(fontSize).fillColor("#b7c8ef");
 
   const drawGroup = (groupStartY) => {
     for (let row = 0; row < 3; row++) {
@@ -144,8 +144,8 @@ const drawCodeGrid = (doc, code) => {
     }
   };
 
-  drawGroup(625);
-  drawGroup(625 + 3 * stepY + 18);
+  drawGroup(startY);
+  drawGroup(startY + 3 * stepY + 18);
 
   doc.fillColor("#000000");
 };
@@ -249,16 +249,34 @@ const buildCertificatePdf = async (certificate) => {
         borderY = doc.y + 1;
       });
 
+      const notesValue = toUpperDisplay(certificate.additionalNotes).trim();
+      let footerStartY = borderY + 10;
       const qrX = 462;
       const qrSize = 80;
-
-      const seExpideY = borderY + 14;
-      const qrY = seExpideY;
-
       const textWidthSinQR = qrX - leftMargin - 10;
+      const footerText = "SE EXPIDE EL PRESENTE CERTIFICADO DE POSESIÓN A SOLICITUD DEL INTERESADO Y PARA LOS FINES QUE CONSIDERE CONVENIENTE.";
+
+      if (notesValue) {
+        doc.font("Times-Roman").fontSize(12).text("NOTAS ADICIONALES:", leftMargin, footerStartY, { width: bodyWidth });
+        const notesTextY = doc.y + 3;
+        const notesHeight = doc.heightOfString(notesValue, { width: bodyWidth, align: "justify" });
+        doc.font("Times-Roman").fontSize(12).text(notesValue, leftMargin, notesTextY, { width: bodyWidth, align: "justify" });
+        footerStartY = notesTextY + notesHeight + 8;
+      }
+
+      const seExpideY = footerStartY + 4;
+      const seExpideHeight = doc.heightOfString(footerText, { width: textWidthSinQR, align: "justify" });
+      const fechaPreview = dateStr;
+      const fechaHeight = doc.heightOfString(fechaPreview, { width: textWidthSinQR, align: "right" });
+      const footerBottomY = Math.max(seExpideY + seExpideHeight, seExpideY + qrSize, seExpideY + seExpideHeight + 10 + fechaHeight);
+      const gridBaseY = notesValue ? 570 : 625;
+      const gridStartY = notesValue ? Math.max(gridBaseY, footerBottomY + 6) : gridBaseY;
+
+      drawCodeGrid(doc, code, gridStartY);
+
       doc.font("Times-Roman").fontSize(12);
       doc.text(
-        "SE EXPIDE EL PRESENTE CERTIFICADO DE POSESIÓN A SOLICITUD DEL INTERESADO Y PARA LOS FINES QUE CONSIDERE CONVENIENTE.",
+        footerText,
         leftMargin, seExpideY, { width: textWidthSinQR, align: "justify" }
       );
 
@@ -267,9 +285,7 @@ const buildCertificatePdf = async (certificate) => {
       doc.text(dateStr, leftMargin, fechaY, { width: textWidthSinQR, align: "right" });
 
       const qrBuffer = await toQrBuffer(qrValue);
-      doc.image(qrBuffer, qrX, qrY, { fit: [qrSize, qrSize] });
-
-      drawCodeGrid(doc, code);
+      doc.image(qrBuffer, qrX, seExpideY, { fit: [qrSize, qrSize] });
 
       doc.end();
     } catch (error) {

@@ -65,11 +65,16 @@ const listClients = async ({ clientType, page, limit, search, documentNumber }) 
   const pagination = getPaginationParams({ page, limit });
 
   const where = {};
+  const filters = [];
 
   if (clientType === "Comunero") {
-    where.commoner = { isNot: null };
+    filters.push({ commoner: { isNot: null } });
+    filters.push({ commoner: { is: { isActive: true } } });
   } else if (clientType === "Tercero") {
-    where.commoner = null;
+    filters.push({ OR: [
+      { commoner: null },
+      { commoner: { is: { isActive: false } } },
+    ] });
   }
 
   if (search) {
@@ -83,11 +88,15 @@ const listClients = async ({ clientType, page, limit, search, documentNumber }) 
       searchOr.push({ commoner: { is: { licenseSequence: Number(normalizedSearch) } } });
     }
 
-    where.OR = searchOr;
+    filters.push({ OR: searchOr });
   }
 
   if (documentNumber) {
-    where.documentNumber = { contains: documentNumber, mode: "insensitive" };
+    filters.push({ documentNumber: { contains: documentNumber, mode: "insensitive" } });
+  }
+
+  if (filters.length > 0) {
+    where.AND = filters;
   }
 
   const [docs, total] = await Promise.all([
@@ -170,10 +179,10 @@ const getClientDeletePreview = async (id) => {
   });
 };
 
-const createClient = async (payload) => {
+const createClient = async (payload, actorRoleName = null) => {
   try {
     return await runClientWriteTransaction(async (tx) => {
-      const data = await buildClientWriteData(tx, payload);
+      const data = await buildClientWriteData(tx, { ...payload, actorRoleName });
 
       const existingClient = await tx.client.findUnique({
         where: { documentNumber: data.documentNumber },
@@ -200,11 +209,11 @@ const createClient = async (payload) => {
   }
 };
 
-const updateClient = async (id, payload) => {
+const updateClient = async (id, payload, actorRoleName = null) => {
   try {
     return await runClientWriteTransaction(async (tx) => {
       const currentClient = await getClientRecordById(id, tx);
-      const data = await buildClientWriteData(tx, payload, currentClient);
+      const data = await buildClientWriteData(tx, { ...payload, actorRoleName }, currentClient);
 
       const existingClient = await tx.client.findUnique({
         where: { documentNumber: data.documentNumber },
