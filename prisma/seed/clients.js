@@ -20,6 +20,16 @@ const parseLicenseSequence = (value) => {
   return Number.isFinite(numeric) ? numeric : null;
 };
 
+const getNextLicenseSequence = async (tx) => {
+  const lastProfile = await tx.commoner.findFirst({
+    where: { licenseSequence: { not: null } },
+    orderBy: { licenseSequence: "desc" },
+    select: { licenseSequence: true },
+  });
+
+  return (lastProfile?.licenseSequence ?? 0) + 1;
+};
+
 async function seedClients(prisma, api) {
   try {
     const clients = await api.listAll("/api/clients", { limit: 100 });
@@ -119,22 +129,41 @@ async function seedClients(prisma, api) {
           });
 
           if (remoteClient.clientType === "Comunero") {
-            await tx.commoner.upsert({
-              where: { clientId: client.id },
-              create: {
-                clientId: client.id,
-                licenseSequence: remoteClient.licenseSequence,
-                createdAt: remoteClient.createdAt,
-                updatedAt: remoteClient.updatedAt,
-              },
-              update: {
-                licenseSequence: remoteClient.licenseSequence,
-                createdAt: remoteClient.createdAt,
-                updatedAt: remoteClient.updatedAt,
-              },
-            });
+            const existingCommoner = await tx.commoner.findUnique({ where: { clientId: client.id } });
+            const licenseSequence = remoteClient.licenseSequence ?? existingCommoner?.licenseSequence ?? await getNextLicenseSequence(tx);
+
+            if (existingCommoner) {
+              await tx.commoner.update({
+                where: { clientId: client.id },
+                data: {
+                  licenseSequence,
+                  isActive: true,
+                  createdAt: remoteClient.createdAt,
+                  updatedAt: remoteClient.updatedAt,
+                },
+              });
+            } else {
+              await tx.commoner.create({
+                data: {
+                  clientId: client.id,
+                  licenseSequence,
+                  isActive: true,
+                  createdAt: remoteClient.createdAt,
+                  updatedAt: remoteClient.updatedAt,
+                },
+              });
+            }
           } else {
-            await tx.commoner.deleteMany({ where: { clientId: client.id } });
+            const existingCommoner = await tx.commoner.findUnique({ where: { clientId: client.id } });
+            if (existingCommoner) {
+              await tx.commoner.update({
+                where: { clientId: client.id },
+                data: {
+                  isActive: false,
+                  updatedAt: remoteClient.updatedAt,
+                },
+              });
+            }
           }
         });
 

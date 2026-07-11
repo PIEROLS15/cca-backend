@@ -10,7 +10,7 @@ const getSummary = async () => {
   const [certificates, clients, comuneros, terrainTypes, sectors] = await Promise.all([
     prisma.certificate.count(),
     prisma.client.count(),
-    prisma.commoner.count({ where: { licenseSequence: { not: null } } }),
+    prisma.commoner.count({ where: { isActive: true } }),
     prisma.terrainType.count(),
     prisma.sector.count(),
   ]);

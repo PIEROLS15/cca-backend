@@ -70,7 +70,7 @@ const createClient = asyncHandler(async (req, res) => {
   const client = await clientsService.createClient({
     ...req.body,
     isComunero: resolvedIsComunero,
-  });
+  }, req.user?.role);
   res.status(201).json(client);
 });
 
@@ -80,7 +80,7 @@ const updateClient = asyncHandler(async (req, res) => {
     ? req.body
     : { ...req.body, isComunero: resolvedIsComunero };
 
-  const client = await clientsService.updateClient(Number(req.params.id), payload);
+  const client = await clientsService.updateClient(Number(req.params.id), payload, req.user?.role);
   res.json(client);
 });
 
