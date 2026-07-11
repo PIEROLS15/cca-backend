@@ -284,6 +284,8 @@ Healthcheck:
 GET /health
 ```
 
+Tambien puedes usar `GET /api/health` por compatibilidad con los frontends.
+
 ---
 
 ## Scripts disponibles
