@@ -6,16 +6,22 @@ const {
 } = require("./certificate-request-legacy.utils");
 
 const CERTIFICATE_REQUEST_STATUS_TO_DB = {
-  "En Proceso": "EnProceso",
-  EnProceso: "EnProceso",
-  Observado: "Observado",
   Recepcionado: "Recepcionado",
+  "En Proceso": "Recepcionado",
+  "Por Firmar": "PorFirmar",
+  PorFirmar: "PorFirmar",
+  "Por Recoger": "PorRecoger",
+  PorRecoger: "PorRecoger",
+  Entregado: "Entregado",
+  Observado: "Observado",
 };
 
 const CERTIFICATE_REQUEST_STATUS_FROM_DB = {
-  EnProceso: "En Proceso",
-  Observado: "Observado",
   Recepcionado: "Recepcionado",
+  PorFirmar: "Por Firmar",
+  PorRecoger: "Por Recoger",
+  Entregado: "Entregado",
+  Observado: "Observado",
 };
 
 const buildRequestNumber = (sequence, date = new Date()) => {
@@ -57,7 +63,8 @@ const formatCertificateRequestResponse = (request) => {
     certificateTypes: normalizeCertificateTypes(request.certificateTypes || [], legacyPayload),
     exposure: request.exposure || legacyPayload?.exposure || "",
     attachments: normalizeAttachments(request.attachments || [], legacyPayload),
-    status: CERTIFICATE_REQUEST_STATUS_FROM_DB[request.status] || request.status || "En Proceso",
+    status: CERTIFICATE_REQUEST_STATUS_FROM_DB[request.status] || request.status || "Recepcionado",
+    statusNote: request.statusNote || null,
     createdBy: {
       dni: user?.dni || "",
       role: user?.role?.name || "",

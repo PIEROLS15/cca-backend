@@ -1,15 +1,19 @@
 const CERTIFICATE_STATUS_TO_DB = {
+  Recepcionado: "Recepcionado",
   "Por Firmar": "PorFirmar",
   PorFirmar: "PorFirmar",
   "Por Recoger": "PorRecoger",
   PorRecoger: "PorRecoger",
   Entregado: "Entregado",
+  Observado: "Observado",
 };
 
 const CERTIFICATE_STATUS_FROM_DB = {
+  Recepcionado: "Recepcionado",
   PorFirmar: "Por Firmar",
   PorRecoger: "Por Recoger",
   Entregado: "Entregado",
+  Observado: "Observado",
 };
 
 const {
@@ -95,6 +99,7 @@ const formatCertificateResponse = (certificate) => {
     requestNumber: certificate.requestNumber || null,
     additionalNotes: certificate.additionalNotes || null,
     status: formatCertificateStatus(certificate.status),
+    statusNote: certificate.statusNote || null,
     createdBy: {
       dni: certificate.user?.dni || null,
       role: certificate.user?.role?.name || null,

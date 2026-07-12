@@ -1,7 +1,15 @@
 const { normalizeComparableText } = require("../../certificate-requests/utils/certificate-request-legacy.utils");
 
-const LIMA_TIME_ZONE = "America/Lima";
 const LIMA_OFFSET_MINUTES = -5 * 60;
+
+const TRACKING_BASE_STEPS = [
+  { key: "Recepcionado", label: "Recepcionado" },
+  { key: "PorFirmar", label: "Por firmar" },
+  { key: "PorRecoger", label: "Por recoger" },
+  { key: "Entregado", label: "Entregado" },
+];
+
+const OBSERVED_STATUS = { key: "Observado", label: "Observado" };
 
 const formatDateTimeInLima = (value) => {
   if (!value) return null;
@@ -18,17 +26,9 @@ const formatDateTimeInLima = (value) => {
   ].join("T");
 };
 
-const CERTIFICATE_TYPES = [
-  { key: "PorFirmar", label: "Por firmar" },
-  { key: "PorRecoger", label: "Por recoger" },
-  { key: "Entregado", label: "Entregado" },
-];
+const CERTIFICATE_TYPES = TRACKING_BASE_STEPS;
 
-const CERTIFICATE_REQUEST_TYPES = [
-  { key: "EnProceso", label: "En proceso" },
-  { key: "Observado", label: "Observado" },
-  { key: "Recepcionado", label: "Recepcionado" },
-];
+const CERTIFICATE_REQUEST_TYPES = TRACKING_BASE_STEPS;
 
 const ASSEMBLY_RECORD_REQUEST_TYPES = [
   { key: "EnProceso", label: "En proceso" },
@@ -74,33 +74,92 @@ const formatCertificateRequestTypes = (types = []) => (Array.isArray(types) ? ty
   .filter(Boolean)
   .join(", ");
 
+const normalizeTrackingStatusKey = (documentType, value) => {
+  const normalized = normalizeComparableText(value);
+  if (!normalized) return null;
+
+  if (normalized.includes("observado")) return "Observado";
+  if (normalized.includes("recepcionado")) return "Recepcionado";
+  if (normalized.includes("enproceso")) {
+    return documentType === "assembly_record_request" ? "EnProceso" : "Recepcionado";
+  }
+  if (normalized.includes("porfirmar")) return "PorFirmar";
+  if (normalized.includes("porrecoger")) return "PorRecoger";
+  if (normalized.includes("entregado")) return "Entregado";
+
+  const steps = DOCUMENT_TYPE_CONFIG[documentType]?.history || [];
+  const match = steps.find((step) => normalizeComparableText(step.key) === normalized || normalizeComparableText(step.label) === normalized);
+  return match?.key || null;
+};
+
 const buildTrackingTimeline = ({ documentType, currentStatus, createdAt = null, historyRows = [] }) => {
   const steps = DOCUMENT_TYPE_CONFIG[documentType]?.history || [];
   const labelByStatus = HISTORY_LABEL_BY_TYPE[documentType] || {};
-  const currentIndex = steps.findIndex((step) => normalizeComparableText(step.label) === normalizeComparableText(currentStatus));
-  const historyByStatus = new Map();
+  const eventRows = [...historyRows]
+    .map((row) => ({
+      ...row,
+      _key: normalizeTrackingStatusKey(documentType, row.status),
+    }))
+    .filter((row) => row._key)
+    .sort((a, b) => {
+      const aTime = new Date(a.changedAt || 0).getTime();
+      const bTime = new Date(b.changedAt || 0).getTime();
+      if (aTime !== bTime) return aTime - bTime;
+      return (a.id || 0) - (b.id || 0);
+    });
 
-  for (const row of historyRows) {
-    historyByStatus.set(row.status, row.changedAt);
+  const timeline = eventRows.map((row) => ({
+    status: labelByStatus[row._key] || row.status,
+    date: formatDateTimeInLima(row.changedAt),
+    done: true,
+    note: row.note || null,
+  }));
+
+  if (!timeline.some((step) => step.status === "Recepcionado")) {
+    timeline.unshift({
+      status: "Recepcionado",
+      date: formatDateTimeInLima(createdAt),
+      done: true,
+      note: null,
+    });
   }
 
-  return steps.map((step, index) => {
-    const isDone = currentIndex >= 0 ? index <= currentIndex : historyByStatus.has(step.key);
-    const statusDate = index === 0
-      ? createdAt
-      : historyByStatus.get(step.key) || null;
-    return {
+  let maxCanonicalIndex = -1;
+  for (const row of eventRows) {
+    if (row._key === OBSERVED_STATUS.key) continue;
+    const index = steps.findIndex((step) => step.key === row._key);
+    if (index > maxCanonicalIndex) maxCanonicalIndex = index;
+  }
+
+  const currentKey = normalizeTrackingStatusKey(documentType, currentStatus);
+  if (currentKey && currentKey !== OBSERVED_STATUS.key) {
+    const currentIndex = steps.findIndex((step) => step.key === currentKey);
+    if (currentIndex > maxCanonicalIndex) maxCanonicalIndex = currentIndex;
+  }
+
+  if (maxCanonicalIndex < 0) {
+    maxCanonicalIndex = 0;
+  }
+
+  const pendingSteps = steps
+    .slice(maxCanonicalIndex + 1)
+    .map((step) => ({
       status: labelByStatus[step.key] || step.label,
-      date: isDone ? formatDateTimeInLima(statusDate) : null,
-      done: isDone,
-    };
-  });
+      date: null,
+      done: false,
+      note: null,
+    }));
+
+  return [...timeline, ...pendingSteps];
 };
 
 const normalizeCurrentStatusLabel = (documentType, currentStatus) => {
-  const steps = DOCUMENT_TYPE_CONFIG[documentType]?.history || [];
-  const match = steps.find((step) => normalizeComparableText(step.label) === normalizeComparableText(currentStatus));
-  return match?.label || currentStatus;
+  const key = normalizeTrackingStatusKey(documentType, currentStatus);
+  if (!key) return currentStatus;
+
+  if (key === "EnProceso") return "En proceso";
+
+  return OBSERVED_STATUS.key === key ? OBSERVED_STATUS.label : (HISTORY_LABEL_BY_TYPE[documentType]?.[key] || currentStatus);
 };
 
 const buildTrackingResponse = ({

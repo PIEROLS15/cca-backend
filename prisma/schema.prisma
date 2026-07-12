@@ -8,15 +8,19 @@ datasource db {
 }
 
 enum CertificateStatus {
+  Recepcionado
   PorFirmar
   PorRecoger
   Entregado
+  Observado
 }
 
 enum CertificateRequestStatus {
-  EnProceso
-  Observado
   Recepcionado
+  PorFirmar
+  PorRecoger
+  Entregado
+  Observado
 }
 
 enum AssemblyRecordRequestStatus {
@@ -164,7 +168,7 @@ model CertificateRequest {
   exposure           String?
   attachments        Json?
   legacyPayload      Json?
-  status             CertificateRequestStatus @default(EnProceso)
+  status             CertificateRequestStatus @default(Recepcionado)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
@@ -209,7 +213,7 @@ model Certificate {
   east              String?
   west              String?
   additionalNotes   String?
-  status            CertificateStatus @default(PorFirmar)
+  status            CertificateStatus @default(Recepcionado)
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
