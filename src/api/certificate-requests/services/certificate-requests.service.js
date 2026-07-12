@@ -11,12 +11,28 @@ const {
   normalizeCertificateRequestStatus,
 } = require("../utils/certificate-requests.utils");
 const clientsService = require("../../clients/services/clients.service");
-const { DOCUMENT_TYPES, recordDocumentStatusHistory } = require("../../../utils/document-status-history.utils");
+const {
+  DOCUMENT_TYPES,
+  recordDocumentStatusHistory,
+  getLatestObservationNotes,
+  getCurrentCanonicalStatusRank,
+  clearLaterDocumentStatusHistory,
+  getCanonicalStatusRank,
+} = require("../../../utils/document-status-history.utils");
 
 const requestIncludes = {
   client: { include: { commoner: true } },
   user: { include: { role: true } },
   partner: { include: { commoner: true } },
+};
+
+const enrichRequestsWithStatusNotes = async (docs) => {
+  const notes = await getLatestObservationNotes(prisma, DOCUMENT_TYPES.CERTIFICATE_REQUEST, docs.map((doc) => doc.id));
+
+  return docs.map((doc) => ({
+    ...doc,
+    statusNote: doc.status === "Observado" ? notes.get(doc.id) || null : null,
+  }));
 };
 
 const REQUEST_NUMBER_COUNTER_KEY = "certificate-request";
@@ -102,6 +118,7 @@ const listCertificateRequests = async ({ page, limit, search }) => {
           OR: [
             { fullName: { contains: search, mode: "insensitive" } },
             { documentNumber: { contains: search, mode: "insensitive" } },
+            { clientCode: { contains: search, mode: "insensitive" } },
           ],
         },
       },
@@ -119,8 +136,10 @@ const listCertificateRequests = async ({ page, limit, search }) => {
     prisma.certificateRequest.count({ where }),
   ]);
 
+  const enrichedDocs = await enrichRequestsWithStatusNotes(docs);
+
   return buildPaginationResult({
-    docs: docs.map(formatCertificateRequestResponse),
+    docs: enrichedDocs.map(formatCertificateRequestResponse),
     total,
     page: pagination.page,
     limit: pagination.limit,
@@ -158,7 +177,8 @@ const getCertificateRequestById = async (identifier) => {
     throw new HttpError(404, "Solicitud de certificado no encontrada");
   }
 
-  return formatCertificateRequestResponse(request);
+  const [enriched] = await enrichRequestsWithStatusNotes([request]);
+  return formatCertificateRequestResponse(enriched);
 };
 
 const getCertificateRequestDeletePreview = async (id) => {
@@ -234,7 +254,7 @@ const createCertificateRequest = async (payload, userId) => {
     }
   }
 
-  return runRequestNumberWriteTransaction(async (tx) => {
+  const request = await runRequestNumberWriteTransaction(async (tx) => {
     const requestNumber = await reserveNextRequestNumber(tx);
 
     const request = await tx.certificateRequest.create({
@@ -243,6 +263,7 @@ const createCertificateRequest = async (payload, userId) => {
         clientId: client.id,
         userId: creator?.id || null,
         partnerId,
+        status: "Recepcionado",
         description: payload.requestDescription || null,
         destination: payload.destination || null,
         requestDescription: payload.requestDescription || null,
@@ -262,8 +283,11 @@ const createCertificateRequest = async (payload, userId) => {
       changedAt: request.createdAt,
     });
 
-    return formatCertificateRequestResponse(request);
+    return request;
   });
+
+  const [enriched] = await enrichRequestsWithStatusNotes([request]);
+  return formatCertificateRequestResponse(enriched);
 };
 
 const updateCertificateRequest = async (id, payload, changedByUserId = null) => {
@@ -328,6 +352,9 @@ const updateCertificateRequest = async (id, payload, changedByUserId = null) => 
     if (!normalized) {
       throw new HttpError(400, "Estado de solicitud de certificado invalido");
     }
+    if (normalized === "Observado" && !String(payload.note || "").trim()) {
+      throw new HttpError(400, "La razón es obligatoria cuando el estado es Observado");
+    }
     data.status = normalized;
     nextStatus = normalized;
   }
@@ -339,19 +366,42 @@ const updateCertificateRequest = async (id, payload, changedByUserId = null) => 
       include: requestIncludes,
     });
 
-    if (nextStatus && nextStatus !== current.status) {
-      await recordDocumentStatusHistory(tx, {
+    const historyRows = await tx.documentStatusHistory.findMany({
+      where: {
         documentType: DOCUMENT_TYPES.CERTIFICATE_REQUEST,
         documentId: id,
-        status: nextStatus,
-        changedByUserId,
-      });
+      },
+      orderBy: [{ changedAt: "asc" }, { id: "asc" }],
+      select: { id: true, changedAt: true, status: true },
+    });
+
+    if (nextStatus && nextStatus !== current.status) {
+      const currentRank = getCurrentCanonicalStatusRank(historyRows, current.status);
+      const nextRank = getCanonicalStatusRank(nextStatus);
+
+      if (nextRank >= 0 && currentRank >= 0 && nextRank < currentRank) {
+        await clearLaterDocumentStatusHistory(tx, {
+          documentType: DOCUMENT_TYPES.CERTIFICATE_REQUEST,
+          documentId: id,
+          targetStatus: nextStatus,
+          historyRows,
+        });
+      } else {
+        await recordDocumentStatusHistory(tx, {
+          documentType: DOCUMENT_TYPES.CERTIFICATE_REQUEST,
+          documentId: id,
+          status: nextStatus,
+          changedByUserId,
+          note: nextStatus === "Observado" ? String(payload.note || "").trim() : null,
+        });
+      }
     }
 
     return result;
   });
 
-  return formatCertificateRequestResponse(updated);
+  const [enriched] = await enrichRequestsWithStatusNotes([updated]);
+  return formatCertificateRequestResponse(enriched);
 };
 
 const deleteCertificateRequest = async (id) => {

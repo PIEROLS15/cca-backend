@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const PDFDocument = require("pdfkit");
+const bwipjs = require("bwip-js");
 
 const LOGO_FILENAME = "logo-comunidad-campesina-asia.png";
 
@@ -19,6 +20,19 @@ const YEAR_TEXT = '"Año de la recuperación y consolidación de la economía pe
 const CUSTOMER_CARE_TEXT = "Numero de atencion al cliente 01 641 3577";
 
 const resolveLogoPath = () => LOGO_CANDIDATE_PATHS.find((candidate) => fs.existsSync(candidate));
+
+const toQrBuffer = (value) =>
+  new Promise((resolve, reject) => {
+    bwipjs.toBuffer(
+      { bcid: "qrcode", text: String(value), scale: 6 },
+      (error, png) => (error ? reject(error) : resolve(png))
+    );
+  });
+
+const buildTrackingUrl = (code) => {
+  const trackingUrl = String(process.env.TRACKING_FRONTEND_URL || "http://localhost:9002").replace(/\/$/, "");
+  return `${trackingUrl}/?type=solicitud&code=${encodeURIComponent(code)}&tab=history`;
+};
 
 const normalizeToken = (value) =>
   String(value || "")
@@ -105,7 +119,7 @@ const buildCertificateRequestTemplatePdf = async (request) => {
   const testimonioAttachment = isSelectedAttachment(attachments, ["Testimonio", "TestimonioDeAdjudicacion", "Testimonio de adjudicacion"]);
   const cellAttachment = attachments.find((item) => normalizeToken(item.type) === normalizeToken("Celular"));
 
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     doc.on("data", (chunk) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
@@ -172,10 +186,10 @@ const buildCertificateRequestTemplatePdf = async (request) => {
 
       const partnerLine =
         partner.fullName || partner.documentNumber
-          ? ` Casado(a) o conviviente con ${toUpperDisplay(partner.fullName)}, DNI: ${toUpperDisplay(partner.documentNumber)}`
+          ? ` Casado(a) o conviviente con ${toUpperDisplay(partner.fullName)}, DNI / CÓDIGO: ${toUpperDisplay(partner.documentNumber)}`
           : "";
 
-      const intro = `Yo, ${toUpperDisplay(client.fullName)}, identificado con DNI N° ${toUpperDisplay(client.documentNumber)}, domiciliado en el anexo ${toUpperDisplay(client.address)}.${partnerLine}`;
+      const intro = `Yo, ${toUpperDisplay(client.fullName)}, identificado con DNI / CÓDIGO N° ${toUpperDisplay(client.documentNumber)}, domiciliado en el anexo ${toUpperDisplay(client.address)}.${partnerLine}`;
       doc.text(intro, 52, doc.y, { width: 470, align: "justify", lineGap: 0 });
       doc.moveDown(1.2);
 
@@ -205,7 +219,7 @@ const buildCertificateRequestTemplatePdf = async (request) => {
         lineGap: 0,
       });
       doc.moveDown(0.08);
-      doc.text(`DNI: ${toUpperDisplay(client.documentNumber)}`, 52, doc.y, {
+      doc.text(`DNI / CÓDIGO: ${toUpperDisplay(client.documentNumber)}`, 52, doc.y, {
         width: 492,
         align: "center",
         lineGap: 0,
@@ -224,7 +238,16 @@ const buildCertificateRequestTemplatePdf = async (request) => {
       drawAttachmentLine(doc, mark(Boolean(cellAttachment)), `Celular Nro. ${toUpperDisplay(cellAttachment?.phoneNumber)}`);
 
       doc.moveDown(0.8);
-      doc.font("Times-Bold").fontSize(12).text(CUSTOMER_CARE_TEXT, 52, doc.y, {
+
+      const qrSize = 80;
+      const qrX = 462;
+      const qrY = doc.y;
+      const trackingUrl = buildTrackingUrl(request.requestNumber);
+      const qrBuffer = await toQrBuffer(trackingUrl);
+      doc.image(qrBuffer, qrX, qrY, { fit: [qrSize, qrSize] });
+
+      const customerCareY = qrY + qrSize + 8;
+      doc.font("Times-Bold").fontSize(12).text(CUSTOMER_CARE_TEXT, 52, customerCareY, {
         width: 492,
         align: "right",
         lineGap: 0,

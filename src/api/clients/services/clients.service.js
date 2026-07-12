@@ -18,7 +18,7 @@ const isLicenseRaceError = (error) => {
 
   return error?.code === "P2002"
     && Array.isArray(error?.meta?.target)
-    && error.meta.target.includes("licenseSequence");
+    && (error.meta.target.includes("licenseSequence") || error.meta.target.includes("clientCode"));
 };
 
 const isDocumentNumberUniqueError = (error) => {
@@ -27,7 +27,7 @@ const isDocumentNumberUniqueError = (error) => {
   }
 
   return Array.isArray(error?.meta?.target)
-    && error.meta.target.includes("documentNumber");
+    && (error.meta.target.includes("documentNumber") || error.meta.target.includes("clientCode"));
 };
 
 const runClientWriteTransaction = async (handler) => {
@@ -81,6 +81,7 @@ const listClients = async ({ clientType, page, limit, search, documentNumber }) 
     const searchOr = [
       { fullName: { contains: search, mode: "insensitive" } },
       { documentNumber: { contains: search, mode: "insensitive" } },
+      { clientCode: { contains: search, mode: "insensitive" } },
     ];
 
     const normalizedSearch = String(search).trim();
@@ -92,7 +93,10 @@ const listClients = async ({ clientType, page, limit, search, documentNumber }) 
   }
 
   if (documentNumber) {
-    filters.push({ documentNumber: { contains: documentNumber, mode: "insensitive" } });
+    filters.push({ OR: [
+      { documentNumber: { contains: documentNumber, mode: "insensitive" } },
+      { clientCode: { contains: documentNumber, mode: "insensitive" } },
+    ] });
   }
 
   if (filters.length > 0) {
@@ -130,6 +134,7 @@ const getClientDeletePreview = async (id) => {
     select: {
       fullName: true,
       documentNumber: true,
+      clientCode: true,
       commoner: true,
       _count: {
         select: {
@@ -150,7 +155,7 @@ const getClientDeletePreview = async (id) => {
 
   return makeDeletionPreview({
     entityLabel: "cliente",
-    itemName: `${client.fullName} (${client.documentNumber})`,
+    itemName: `${client.fullName} (${client.documentNumber || client.clientCode || "Sin documento"})`,
     willDelete: client.commoner
       ? [makeImpactItem({ label: "Ficha de comunero", count: 1 })]
       : [],
@@ -184,13 +189,15 @@ const createClient = async (payload, actorRoleName = null) => {
     return await runClientWriteTransaction(async (tx) => {
       const data = await buildClientWriteData(tx, { ...payload, actorRoleName });
 
-      const existingClient = await tx.client.findUnique({
-        where: { documentNumber: data.documentNumber },
-        select: { id: true },
-      });
+      const existingClient = data.documentNumber
+        ? await tx.client.findUnique({
+            where: { documentNumber: data.documentNumber },
+            select: { id: true },
+          })
+        : null;
 
-      if (existingClient) {
-        throw new HttpError(409, "Ya existe un cliente registrado con ese DNI/RUC");
+      if (data.documentNumber && existingClient) {
+        throw new HttpError(409, "Ya existe un cliente registrado con ese DNI/RUC o código");
       }
 
       const client = await tx.client.create({
@@ -202,7 +209,7 @@ const createClient = async (payload, actorRoleName = null) => {
     });
   } catch (error) {
     if (isDocumentNumberUniqueError(error)) {
-      throw new HttpError(409, "Ya existe un cliente registrado con ese DNI/RUC");
+      throw new HttpError(409, "Ya existe un cliente registrado con ese DNI/RUC o código");
     }
 
     throw error;
@@ -215,13 +222,15 @@ const updateClient = async (id, payload, actorRoleName = null) => {
       const currentClient = await getClientRecordById(id, tx);
       const data = await buildClientWriteData(tx, { ...payload, actorRoleName }, currentClient);
 
-      const existingClient = await tx.client.findUnique({
-        where: { documentNumber: data.documentNumber },
-        select: { id: true },
-      });
+      const existingClient = data.documentNumber
+        ? await tx.client.findUnique({
+            where: { documentNumber: data.documentNumber },
+            select: { id: true },
+          })
+        : null;
 
-      if (existingClient && existingClient.id !== currentClient.id) {
-        throw new HttpError(409, "Ya existe un cliente registrado con ese DNI/RUC");
+      if (data.documentNumber && existingClient && existingClient.id !== currentClient.id) {
+        throw new HttpError(409, "Ya existe un cliente registrado con ese DNI/RUC o código");
       }
 
       const client = await tx.client.update({
@@ -234,7 +243,7 @@ const updateClient = async (id, payload, actorRoleName = null) => {
     });
   } catch (error) {
     if (isDocumentNumberUniqueError(error)) {
-      throw new HttpError(409, "Ya existe un cliente registrado con ese DNI/RUC");
+      throw new HttpError(409, "Ya existe un cliente registrado con ese DNI/RUC o código");
     }
 
     throw error;
@@ -244,33 +253,47 @@ const updateClient = async (id, payload, actorRoleName = null) => {
 const upsertClientByDocument = async (documentNumber, payload) => {
   try {
     return await runClientWriteTransaction(async (tx) => {
+      const identifier = String(documentNumber || "").trim();
+      const isClientCode = /^CLI-\d+$/i.test(identifier);
+      const normalizedIdentifier = isClientCode ? identifier.toUpperCase() : identifier;
       const currentClient = await tx.client.findUnique({
-        where: { documentNumber },
+        where: { documentNumber: normalizedIdentifier },
         include: { commoner: true },
       });
 
+      const clientByCode = currentClient ? null : await tx.client.findUnique({
+        where: { clientCode: normalizedIdentifier },
+        include: { commoner: true },
+      });
+
+      const resolvedClient = currentClient || clientByCode;
+
+      if (isClientCode && !resolvedClient) {
+        throw new HttpError(404, "No se encontró un cliente con ese código");
+      }
+
       const data = await buildClientWriteData(
         tx,
-        { ...payload, documentNumber },
-        currentClient,
+        { ...payload, documentNumber: normalizedIdentifier, noDocument: isClientCode },
+        resolvedClient,
       );
 
-      if (currentClient) {
+      if (resolvedClient) {
         return tx.client.update({
-          where: { id: currentClient.id },
+          where: { id: resolvedClient.id },
           data,
           include: { commoner: true },
         });
       }
 
       return tx.client.create({
-        data: { ...data, documentNumber },
+        data: { ...data, documentNumber: normalizedIdentifier },
         include: { commoner: true },
       });
     });
   } catch (error) {
     if (isDocumentNumberUniqueError(error)) {
-      throw new HttpError(409, "Ya existe un cliente registrado con ese DNI/RUC");
+      throw new HttpError(409, "Ya existe un cliente registrado con ese DNI/RUC o código");
     }
 
     throw error;
@@ -288,12 +311,17 @@ const deleteClient = async (id) => {
 
 const searchByDocument = async (document) => {
   const client = await prisma.client.findFirst({
-    where: { documentNumber: { contains: document } },
+    where: {
+      OR: [
+        { documentNumber: { contains: document, mode: "insensitive" } },
+        { clientCode: { contains: document, mode: "insensitive" } },
+      ],
+    },
     include: { commoner: true },
   });
 
   if (!client) {
-    throw new HttpError(404, "No se encontró ningún cliente con ese documento");
+    throw new HttpError(404, "No se encontró ningún cliente con ese documento o código");
   }
 
   return formatClientResponse(client);

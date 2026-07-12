@@ -51,7 +51,9 @@ const buildCertificateVerificationPayload = (certificate) => {
 };
 
 const buildCertificateVerificationUrl = (token) => {
-  const frontendUrl = String(process.env.FRONTEND_URL || "http://localhost:9000").replace(/\/$/, "");
+  const frontendUrl = String(process.env.FRONTEND_URL || "http://localhost:9000")
+    .split(",")[0]
+    .replace(/\/$/, "");
   return `${frontendUrl}/verificar-certificado/${encodeURIComponent(token)}`;
 };
 

@@ -8,15 +8,19 @@ datasource db {
 }
 
 enum CertificateStatus {
+  Recepcionado
   PorFirmar
   PorRecoger
   Entregado
+  Observado
 }
 
 enum CertificateRequestStatus {
-  EnProceso
-  Observado
   Recepcionado
+  PorFirmar
+  PorRecoger
+  Entregado
+  Observado
 }
 
 enum AssemblyRecordRequestStatus {
@@ -123,7 +127,8 @@ model TerrainType {
 model Client {
   id             Int      @id @default(autoincrement())
   fullName       String
-  documentNumber String   @unique
+  documentNumber String?  @unique
+  clientCode     String?  @unique
   address        String?
   phone          String?
   createdAt      DateTime @default(now())
@@ -163,7 +168,7 @@ model CertificateRequest {
   exposure           String?
   attachments        Json?
   legacyPayload      Json?
-  status             CertificateRequestStatus @default(EnProceso)
+  status             CertificateRequestStatus @default(Recepcionado)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
@@ -208,7 +213,7 @@ model Certificate {
   east              String?
   west              String?
   additionalNotes   String?
-  status            CertificateStatus @default(PorFirmar)
+  status            CertificateStatus @default(Recepcionado)
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 

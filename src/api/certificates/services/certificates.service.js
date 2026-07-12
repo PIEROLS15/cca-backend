@@ -14,7 +14,14 @@ const { makeDeletionPreview, makeImpactItem } = require("../../../utils/deletion
 const {
   buildCertificateVerificationPayload,
 } = require("../utils/certificate-verification.utils");
-const { DOCUMENT_TYPES, recordDocumentStatusHistory } = require("../../../utils/document-status-history.utils");
+const {
+  DOCUMENT_TYPES,
+  recordDocumentStatusHistory,
+  getLatestObservationNotes,
+  getCurrentCanonicalStatusRank,
+  clearLaterDocumentStatusHistory,
+  getCanonicalStatusRank,
+} = require("../../../utils/document-status-history.utils");
 
 const MAX_ADDITIONAL_NOTES_LENGTH = 120;
 
@@ -31,11 +38,20 @@ const certificateInclude = {
   },
 };
 
+const enrichCertificatesWithStatusNotes = async (docs) => {
+  const notes = await getLatestObservationNotes(prisma, DOCUMENT_TYPES.CERTIFICATE, docs.map((doc) => doc.id));
+
+  return docs.map((doc) => ({
+    ...doc,
+    statusNote: doc.status === "Observado" ? notes.get(doc.id) || null : null,
+  }));
+};
+
 const normalizeOwnerEntries = (owners = []) => owners
   .map((owner) => ({
     id: Number(owner?.id) || null,
     fullName: String(owner?.fullName || "").trim(),
-    documentNumber: String(owner?.documentNumber || "").replace(/\D/g, "").trim(),
+    documentNumber: String(owner?.documentNumber || "").trim().toUpperCase(),
   }))
   .filter((owner) => owner.id || owner.documentNumber || owner.fullName);
 
@@ -46,7 +62,7 @@ const normalizeComparableName = (value) => String(value || "")
   .trim()
   .toLowerCase();
 
-const normalizeDocumentNumber = (value) => String(value || "").replace(/\D/g, "").trim();
+const normalizeOwnerIdentifier = (value) => String(value || "").trim().toUpperCase();
 
 const normalizeAdditionalNotes = (value) => String(value || "").trim();
 
@@ -133,26 +149,31 @@ const resolveOwnerClients = async (tx, owners = []) => {
   const seen = new Set();
 
   for (const owner of ownerEntries) {
-    const documentNumber = normalizeDocumentNumber(owner.documentNumber);
+    const identifier = normalizeOwnerIdentifier(owner.documentNumber);
     const fullName = String(owner.fullName || "").trim();
 
-    if (!documentNumber) {
-      throw new HttpError(400, "Cada dueño debe tener DNI");
+    if (!identifier) {
+      throw new HttpError(400, "Cada dueño debe tener DNI o código");
     }
 
     if (!fullName) {
-      throw new HttpError(400, "Cada dueño debe tener nombres y DNI");
+      throw new HttpError(400, "Cada dueño debe tener nombres y documento");
     }
 
-    let client = await tx.client.findUnique({
-      where: { documentNumber },
-      select: { id: true, fullName: true, documentNumber: true },
+    let client = await tx.client.findFirst({
+      where: {
+        OR: [
+          { documentNumber: identifier },
+          { clientCode: identifier },
+        ],
+      },
+      select: { id: true, fullName: true, documentNumber: true, clientCode: true },
     });
 
     if (!client && owner.id) {
       client = await tx.client.findUnique({
         where: { id: owner.id },
-        select: { id: true, fullName: true, documentNumber: true },
+        select: { id: true, fullName: true, documentNumber: true, clientCode: true },
       });
     }
 
@@ -161,18 +182,19 @@ const resolveOwnerClients = async (tx, owners = []) => {
         client = await tx.client.update({
           where: { id: client.id },
           data: { fullName },
-          select: { id: true, fullName: true, documentNumber: true },
+          select: { id: true, fullName: true, documentNumber: true, clientCode: true },
         });
       }
     } else {
       client = await tx.client.create({
         data: {
           fullName,
-          documentNumber,
+          documentNumber: /^CLI-\d+$/i.test(identifier) ? null : identifier,
+          clientCode: /^CLI-\d+$/i.test(identifier) ? identifier : null,
           address: null,
           phone: null,
         },
-        select: { id: true, fullName: true, documentNumber: true },
+        select: { id: true, fullName: true, documentNumber: true, clientCode: true },
       });
     }
 
@@ -203,8 +225,10 @@ const listCertificates = async (query) => {
     prisma.certificate.count({ where }),
   ]);
 
+  const enrichedDocs = await enrichCertificatesWithStatusNotes(docs);
+
   return buildPaginationResult({
-    docs: docs.map(formatCertificateResponse),
+    docs: enrichedDocs.map(formatCertificateResponse),
     total,
     page: pagination.page,
     limit: pagination.limit,
@@ -221,7 +245,8 @@ const getCertificateById = async (id) => {
     throw new HttpError(404, "Certificado no encontrado");
   }
 
-  return formatCertificateResponse(certificate);
+  const [enriched] = await enrichCertificatesWithStatusNotes([certificate]);
+  return formatCertificateResponse(enriched);
 };
 
 const createCertificate = async (payload, userId) => {
@@ -275,7 +300,10 @@ const createCertificate = async (payload, userId) => {
       throw new Error("No se pudo generar el numero de certificado");
     }
 
-    const statusNormalized = normalizeCertificateStatus(payload.status) || "PorFirmar";
+    const statusNormalized = normalizeCertificateStatus(payload.status) || "Recepcionado";
+    if (statusNormalized === "Observado" && !String(payload.note || "").trim()) {
+      throw new HttpError(400, "La razón es obligatoria cuando el estado es Observado");
+    }
     const measurementModeUsed = normalizeTerrainMeasurementMode(payload.terrain?.measurementModeUsed)
       || deriveTerrainMeasurementMode(payload.terrain);
 
@@ -317,6 +345,7 @@ const createCertificate = async (payload, userId) => {
       status: statusNormalized,
       changedByUserId: userId,
       changedAt: created.createdAt,
+      note: statusNormalized === "Observado" ? String(payload.note || "").trim() : null,
     });
 
     const withOwners = await tx.certificate.findUnique({
@@ -324,13 +353,11 @@ const createCertificate = async (payload, userId) => {
       include: certificateInclude,
     });
 
-    return tx.certificate.findUnique({
-      where: { id: created.id },
-      include: certificateInclude,
-    });
+    return withOwners;
   });
 
-  return formatCertificateResponse(certificate);
+  const statusNote = statusNormalized === "Observado" ? String(payload.note || "").trim() : null;
+  return formatCertificateResponse({ ...certificate, statusNote });
 };
 
 const getCertificateDeletePreview = async (id) => {
@@ -489,9 +516,21 @@ const updateCertificate = async (id, payload, changedByUserId = null) => {
       if (!normalized) {
         throw new HttpError(400, "Estado de certificado invalido");
       }
+      if (normalized === "Observado" && !String(payload.note || "").trim()) {
+        throw new HttpError(400, "La razón es obligatoria cuando el estado es Observado");
+      }
       data.status = normalized;
       nextStatus = normalized;
     }
+
+    const historyRows = await tx.documentStatusHistory.findMany({
+      where: {
+        documentType: DOCUMENT_TYPES.CERTIFICATE,
+        documentId: id,
+      },
+      orderBy: [{ changedAt: "asc" }, { id: "asc" }],
+      select: { id: true, changedAt: true, status: true },
+    });
 
     if (Object.keys(data).length > 0) {
       await tx.certificate.update({
@@ -505,12 +544,25 @@ const updateCertificate = async (id, payload, changedByUserId = null) => {
     }
 
     if (nextStatus && nextStatus !== existing.status) {
+      const currentRank = getCurrentCanonicalStatusRank(historyRows, existing.status);
+      const nextRank = getCanonicalStatusRank(nextStatus);
+
+      if (nextRank >= 0 && currentRank >= 0 && nextRank < currentRank) {
+        await clearLaterDocumentStatusHistory(tx, {
+          documentType: DOCUMENT_TYPES.CERTIFICATE,
+          documentId: id,
+          targetStatus: nextStatus,
+          historyRows,
+        });
+      } else {
       await recordDocumentStatusHistory(tx, {
         documentType: DOCUMENT_TYPES.CERTIFICATE,
         documentId: id,
         status: nextStatus,
         changedByUserId,
+        note: nextStatus === "Observado" ? String(payload.note || "").trim() : null,
       });
+      }
     }
 
     return tx.certificate.findUnique({
@@ -519,7 +571,8 @@ const updateCertificate = async (id, payload, changedByUserId = null) => {
     });
   });
 
-  return formatCertificateResponse(certificate);
+  const [enriched] = await enrichCertificatesWithStatusNotes([certificate]);
+  return formatCertificateResponse(enriched);
 };
 
 const deleteCertificate = async (id) => {
@@ -540,7 +593,8 @@ const getCertificateByNumber = async (certificateNumber) => {
     throw new HttpError(404, "Certificado no encontrado");
   }
 
-  return formatCertificateResponse(certificate);
+  const [enriched] = await enrichCertificatesWithStatusNotes([certificate]);
+  return formatCertificateResponse(enriched);
 };
 
 const getCertificateVerificationByToken = async (token) => {
@@ -553,7 +607,8 @@ const getCertificateVerificationByToken = async (token) => {
     throw new HttpError(404, "Certificado no encontrado");
   }
 
-  return buildCertificateVerificationPayload(formatCertificateResponse(certificate));
+  const [enriched] = await enrichCertificatesWithStatusNotes([certificate]);
+  return buildCertificateVerificationPayload(formatCertificateResponse(enriched));
 };
 
 module.exports = {

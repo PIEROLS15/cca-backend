@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const PDFDocument = require("pdfkit");
+const bwipjs = require("bwip-js");
 
 const LOGO_FILENAME = "logo-comunidad-campesina-asia.png";
 
@@ -16,6 +17,19 @@ const LOGO_CANDIDATE_PATHS = [
 ];
 
 const resolveLogoPath = () => LOGO_CANDIDATE_PATHS.find((candidate) => fs.existsSync(candidate));
+
+const toQrBuffer = (value) =>
+  new Promise((resolve, reject) => {
+    bwipjs.toBuffer(
+      { bcid: "qrcode", text: String(value), scale: 6 },
+      (error, png) => (error ? reject(error) : resolve(png))
+    );
+  });
+
+const buildTrackingUrl = (certificateNumber) => {
+  const trackingUrl = String(process.env.TRACKING_FRONTEND_URL || "http://localhost:9002").replace(/\/$/, "");
+  return `${trackingUrl}/?type=acta&code=${encodeURIComponent(certificateNumber)}&tab=history`;
+};
 
 const toUpperDisplay = (value) => String(value ?? "").toUpperCase();
 
@@ -70,7 +84,7 @@ const buildAssemblyRecordRequestTemplatePdf = async (request) => {
   const totalAreaValue = certificate.area ?? certificate.totalArea ?? null;
   const awardDateValue = toIsoDate(request.awardDate);
 
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     doc.on("data", (chunk) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
@@ -127,6 +141,7 @@ const buildAssemblyRecordRequestTemplatePdf = async (request) => {
       drawLineText(doc, "TIEMPO DE POSESION DEL TERRENO", possessionTime ? `${possessionTime}` : "", leftX, contentWidth);
       drawLineText(doc, "CORREO ELECTRONICO", email, leftX, contentWidth);
       drawLineText(doc, "TELEFONO", phone, leftX, contentWidth);
+      drawLineText(doc, "CODIGO DEL CERTIFICADO", toUpperDisplay(certificate.certificateNumber), leftX, contentWidth);
 
       doc.moveDown(0.95);
       doc.font("Times-Roman").fontSize(12).text("ADJUNTAR:", leftX, doc.y, { width: contentWidth });
@@ -147,7 +162,16 @@ const buildAssemblyRecordRequestTemplatePdf = async (request) => {
       });
 
       doc.moveDown(0.75);
-      doc.font("Times-Bold").fontSize(12).text("Número de atención al cliente 01 641 3577", leftX, 720, {
+
+      const qrSize = 80;
+      const qrX = 462;
+      const qrY = 620;
+      const trackingUrl = buildTrackingUrl(certificate.certificateNumber);
+      const qrBuffer = await toQrBuffer(trackingUrl);
+      doc.image(qrBuffer, qrX, qrY, { fit: [qrSize, qrSize] });
+
+      const customerCareY = qrY + qrSize + 8;
+      doc.font("Times-Bold").fontSize(12).text("Número de atención al cliente 01 641 3577", leftX, customerCareY, {
         width: 492,
         align: "right",
       });

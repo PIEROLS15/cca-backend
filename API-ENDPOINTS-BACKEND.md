@@ -513,7 +513,7 @@ Example response:
        "attachments": [
          { "type": "CopiaDni" }
        ],
-       "status": "En Proceso",
+        "status": "Recepcionado",
        "createdBy": { "dni": "00000258", "role": "Atencion" },
        "createdAt": "2026-05-18T20:35:20.000Z",
        "updatedAt": "2026-05-18T20:35:20.000Z"
@@ -750,7 +750,7 @@ Example response:
         "certificateNumber": "000001"
       },
       "description": "Solicitud de acta de asamblea",
-      "status": "En Proceso",
+        "status": "Recepcionado",
       "createdAt": "2026-05-18T20:35:20.000Z",
       "updatedAt": "2026-05-18T20:35:20.000Z"
     }
@@ -839,9 +839,11 @@ Query opcional:
 Example response:
 ```json
 [
+  { "name": "Recepcionado", "value": 2, "color": "oklch(0.72 0.14 235)" },
   { "name": "Por firmar", "value": 5, "color": "oklch(0.6 0.22 25)" },
   { "name": "Por recoger", "value": 3, "color": "oklch(0.78 0.16 75)" },
-  { "name": "Entregado", "value": 12, "color": "oklch(0.65 0.16 155)" }
+  { "name": "Entregado", "value": 12, "color": "oklch(0.65 0.16 155)" },
+  { "name": "Observado", "value": 1, "color": "oklch(0.62 0.24 25)" }
 ]
 ```
 
@@ -928,6 +930,7 @@ Example response:
 
 ### GET `/api/public/tracking/:documentType/:code`
 Consulta un documento y devuelve su informacion basica, estado actual e historial.
+Cuando el documento pasa a `Observado`, el historial incluye la razon en `note`.
 
 `documentType` admite alias como `certificado`, `solicitud-certificado`, `solicitud-de-certificado`, `acta`, `solicitud-acta`.
 
@@ -941,7 +944,7 @@ Example response:
     "documentType": "certificate",
     "title": "Certificado",
     "code": "023665",
-    "currentStatus": "Por firmar",
+     "currentStatus": "Recepcionado",
     "information": {
       "people": [
         {
@@ -957,11 +960,12 @@ Example response:
         { "label": "Lote", "value": "5" }
       ]
     },
-    "history": [
-      { "status": "Por firmar", "date": "2026-05-15T17:07:00.000Z", "done": true },
-      { "status": "Por recoger", "date": null, "done": false },
-      { "status": "Entregado", "date": null, "done": false }
-    ]
+     "history": [
+       { "status": "Recepcionado", "date": "2026-05-15T17:07:00.000Z", "done": true, "note": null },
+       { "status": "Por firmar", "date": null, "done": false, "note": null },
+       { "status": "Por recoger", "date": null, "done": false, "note": null },
+       { "status": "Entregado", "date": null, "done": false, "note": null }
+     ]
   }
 }
 ```

@@ -44,6 +44,15 @@ function getAuthCookieOptions({ includeMaxAge = true } = {}) {
   return options;
 }
 
+function getHostOnlyAuthCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+  };
+}
+
 const login = asyncHandler(async (req, res) => {
   const { username, password } = req.body;
 
@@ -65,6 +74,7 @@ const me = asyncHandler(async (req, res) => {
 
 const logout = asyncHandler(async (req, res) => {
   res.clearCookie("token", getAuthCookieOptions({ includeMaxAge: false }));
+  res.clearCookie("token", getHostOnlyAuthCookieOptions());
   res.json({ message: "Sesión cerrada correctamente" });
 });
 
