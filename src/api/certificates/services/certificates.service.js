@@ -254,7 +254,7 @@ const createCertificate = async (payload, userId) => {
     throw new HttpError(401, "Usuario autenticado requerido");
   }
 
-  const certificate = await runCertificateWriteTransaction(async (tx) => {
+  const { certificate, statusNote } = await runCertificateWriteTransaction(async (tx) => {
     const ownerClients = await resolveOwnerClients(tx, payload.owners || []);
     const ownerIds = ownerClients.map((owner) => owner.id);
 
@@ -353,10 +353,10 @@ const createCertificate = async (payload, userId) => {
       include: certificateInclude,
     });
 
-    return withOwners;
+    const statusNote = statusNormalized === "Observado" ? String(payload.note || "").trim() : null;
+    return { certificate: withOwners, statusNote };
   });
 
-  const statusNote = statusNormalized === "Observado" ? String(payload.note || "").trim() : null;
   return formatCertificateResponse({ ...certificate, statusNote });
 };
 
