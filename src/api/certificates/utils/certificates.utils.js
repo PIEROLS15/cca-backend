@@ -170,8 +170,14 @@ const buildCertificateFilters = (query) => {
   if (query.name || query.documentNumber) {
     const clientConditions = [];
     if (query.name) clientConditions.push({ fullName: { contains: query.name, mode: "insensitive" } });
-    if (query.documentNumber) clientConditions.push({ documentNumber: { contains: query.documentNumber, mode: "insensitive" } });
-    if (query.documentNumber) clientConditions.push({ clientCode: { contains: query.documentNumber, mode: "insensitive" } });
+    if (query.documentNumber) {
+      clientConditions.push({
+        OR: [
+          { documentNumber: { contains: query.documentNumber, mode: "insensitive" } },
+          { clientCode: { contains: query.documentNumber, mode: "insensitive" } },
+        ],
+      });
+    }
     const clientFilter = clientConditions.length > 0 ? { AND: clientConditions } : undefined;
 
     const existingAND = where.AND || [];
