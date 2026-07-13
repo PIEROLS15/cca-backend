@@ -171,7 +171,7 @@ const buildAssemblyRecordRequestTemplatePdf = async (request) => {
       doc.image(qrBuffer, qrX, qrY, { fit: [qrSize, qrSize] });
 
       const customerCareY = qrY + qrSize + 8;
-      doc.font("Times-Bold").fontSize(12).text("Número de atención al cliente 01 641 3577", leftX, customerCareY, {
+      doc.font("Times-Bold").fontSize(12).text("Número de atención al cliente: 994325469", leftX, customerCareY, {
         width: 492,
         align: "right",
       });
