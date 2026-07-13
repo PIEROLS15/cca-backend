@@ -17,7 +17,7 @@ const LOGO_CANDIDATE_PATHS = [
 ];
 
 const YEAR_TEXT = '"Año de la recuperación y consolidación de la economía peruana"';
-const CUSTOMER_CARE_TEXT = "Numero de atencion al cliente 01 641 3577";
+const CUSTOMER_CARE_TEXT = "Número de atención al cliente: 994325469";
 
 const resolveLogoPath = () => LOGO_CANDIDATE_PATHS.find((candidate) => fs.existsSync(candidate));
 
