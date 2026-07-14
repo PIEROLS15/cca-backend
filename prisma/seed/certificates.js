@@ -1,9 +1,11 @@
 const { Prisma } = require("@prisma/client");
 
 const STATUS_MAP = {
+  recepcionado: "Recepcionado",
   "por firmar": "PorFirmar",
   "por recoger": "PorRecoger",
   entregado: "Entregado",
+  observado: "Observado",
 };
 
 const parseDate = (value) => {
@@ -160,6 +162,10 @@ async function seedCertificates(prisma, api) {
     requestByNumber.set(normalizeText(row.requestNumber), row.id);
   }
 
+  const localClientIds = new Set(
+    (await prisma.client.findMany({ select: { id: true } })).map((client) => client.id)
+  );
+
   const fallbackUser = await prisma.user.findUnique({
     where: { username: "pierols" },
     select: { id: true },
@@ -189,6 +195,13 @@ async function seedCertificates(prisma, api) {
     if (!ownerIds.length) {
       skipped++;
       console.warn(`  ⚠ Sin propietario principal: certificado ${certificateNumber}`);
+      continue;
+    }
+
+    const missingOwnerIds = ownerIds.filter((ownerId) => !localClientIds.has(ownerId));
+    if (missingOwnerIds.length > 0) {
+      skipped++;
+      console.warn(`  ⚠ El certificado #${id} "${certificateNumber}" referencia propietarios inexistentes en local: ${missingOwnerIds.join(", ")}`);
       continue;
     }
 
