@@ -11,6 +11,8 @@ const normalizeText = (value) => {
   return String(value).trim() || null;
 };
 
+const normalizeOptionalKey = (value) => normalizeText(value);
+
 const parseLicenseSequence = (value) => {
   if (value === null || value === undefined || value === "") {
     return null;
@@ -44,6 +46,7 @@ async function seedClients(prisma, api) {
         id: Number(client?.id),
         fullName: normalizeText(client?.fullName) || "-",
         documentNumber: normalizeText(client?.documentNumber),
+        clientCode: normalizeOptionalKey(client?.clientCode),
         address: normalizeText(client?.address),
         phone: normalizeText(client?.phone),
         clientType: client?.clientType,
@@ -51,12 +54,13 @@ async function seedClients(prisma, api) {
         createdAt: parseDate(client?.createdAt),
         updatedAt: parseDate(client?.updatedAt),
       }))
-      .filter((client) => client.id && client.documentNumber);
+      .filter((client) => client.id);
 
     const existingClients = await prisma.client.findMany({
       select: {
         id: true,
         documentNumber: true,
+        clientCode: true,
         _count: {
           select: {
             certificates: true,
@@ -72,6 +76,7 @@ async function seedClients(prisma, api) {
 
     const existingById = new Map(existingClients.map((client) => [client.id, client]));
     const existingByDocument = new Map(existingClients.map((client) => [client.documentNumber, client]));
+    const existingByCode = new Map(existingClients.filter((client) => client.clientCode).map((client) => [client.clientCode, client]));
     const remoteIds = new Set();
 
     let imported = 0;
@@ -83,26 +88,37 @@ async function seedClients(prisma, api) {
       remoteIds.add(remoteClient.id);
 
       const byId = existingById.get(remoteClient.id) || null;
-      const byDocument = !byId ? existingByDocument.get(remoteClient.documentNumber) || null : null;
+      const byDocument = !byId && remoteClient.documentNumber
+        ? existingByDocument.get(remoteClient.documentNumber) || null
+        : null;
+      const byCode = !byId && !byDocument && remoteClient.clientCode
+        ? existingByCode.get(remoteClient.clientCode) || null
+        : null;
 
-      if (byDocument && byDocument.id !== remoteClient.id) {
+      const conflictingClient = byDocument || byCode;
+      if (conflictingClient && conflictingClient.id !== remoteClient.id) {
         const dependencyCount =
-          byDocument._count.certificates +
-          byDocument._count.partnerCertificates +
-          byDocument._count.certificateRequests +
-          byDocument._count.partnerRequests +
-          byDocument._count.assemblyRecordRequests +
-          byDocument._count.certificateOwners;
+          conflictingClient._count.certificates +
+          conflictingClient._count.partnerCertificates +
+          conflictingClient._count.certificateRequests +
+          conflictingClient._count.partnerRequests +
+          conflictingClient._count.assemblyRecordRequests +
+          conflictingClient._count.certificateOwners;
 
         if (dependencyCount > 0) {
-          console.warn(`  ⚠ No se pudo recrear el cliente #${remoteClient.id} "${remoteClient.documentNumber}" porque el registro local equivalente tiene ${dependencyCount} dependencias`);
+          console.warn(`  ⚠ No se pudo recrear el cliente #${remoteClient.id} "${remoteClient.documentNumber || remoteClient.clientCode || remoteClient.fullName}" porque el registro local equivalente tiene ${dependencyCount} dependencias`);
           skipped++;
           continue;
         }
 
-        await prisma.client.delete({ where: { id: byDocument.id } });
-        existingById.delete(byDocument.id);
-        existingByDocument.delete(byDocument.documentNumber);
+        await prisma.client.delete({ where: { id: conflictingClient.id } });
+        existingById.delete(conflictingClient.id);
+        if (conflictingClient.documentNumber) {
+          existingByDocument.delete(conflictingClient.documentNumber);
+        }
+        if (conflictingClient.clientCode) {
+          existingByCode.delete(conflictingClient.clientCode);
+        }
       }
 
       try {
@@ -113,6 +129,7 @@ async function seedClients(prisma, api) {
               id: remoteClient.id,
               fullName: remoteClient.fullName,
               documentNumber: remoteClient.documentNumber,
+              clientCode: remoteClient.clientCode,
               address: remoteClient.address,
               phone: remoteClient.phone,
               createdAt: remoteClient.createdAt,
@@ -121,6 +138,7 @@ async function seedClients(prisma, api) {
             update: {
               fullName: remoteClient.fullName,
               documentNumber: remoteClient.documentNumber,
+              clientCode: remoteClient.clientCode,
               address: remoteClient.address,
               phone: remoteClient.phone,
               createdAt: remoteClient.createdAt,
@@ -173,10 +191,10 @@ async function seedClients(prisma, api) {
           imported++;
         }
 
-        console.log(`  ✓ Cliente #${remoteClient.id} "${remoteClient.documentNumber}"`);
+        console.log(`  ✓ Cliente #${remoteClient.id} "${remoteClient.documentNumber || remoteClient.clientCode || remoteClient.fullName}"`);
       } catch (err) {
         skipped++;
-        console.warn(`  ⚠ No se pudo importar el cliente #${remoteClient.id} "${remoteClient.documentNumber}": ${err.message}`);
+        console.warn(`  ⚠ No se pudo importar el cliente #${remoteClient.id} "${remoteClient.documentNumber || remoteClient.clientCode || remoteClient.fullName}": ${err.message}`);
       }
     }
 
@@ -194,14 +212,14 @@ async function seedClients(prisma, api) {
         existingClient._count.certificateOwners;
 
       if (dependencyCount > 0) {
-        console.warn(`  ⚠ No se eliminó el cliente #${existingClient.id} "${existingClient.documentNumber}" porque tiene ${dependencyCount} registros asociados`);
+        console.warn(`  ⚠ No se eliminó el cliente #${existingClient.id} "${existingClient.documentNumber || existingClient.clientCode || "Sin identificador"}" porque tiene ${dependencyCount} registros asociados`);
         skipped++;
         continue;
       }
 
       await prisma.client.delete({ where: { id: existingClient.id } });
       deleted++;
-      console.log(`  ✓ Cliente eliminado #${existingClient.id} "${existingClient.documentNumber}"`);
+      console.log(`  ✓ Cliente eliminado #${existingClient.id} "${existingClient.documentNumber || existingClient.clientCode || "Sin identificador"}"`);
     }
 
     const comuneros = remoteClients.filter((client) => client.clientType === "Comunero").length;
