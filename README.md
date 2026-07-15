@@ -182,6 +182,26 @@ Esto levanta:
 
 El arranque ya no ejecuta migraciones ni seeds automaticamente.
 
+### Pruebas con Docker
+
+Usa el entorno de test cuando quieras validar cambios antes de desplegar.
+Ese compose usa un nombre de proyecto distinto, asi que no comparte contenedores ni volumenes con tu entorno local.
+
+```bash
+docker compose -p cca-backend-test -f docker-compose.test.yml up -d db backend
+docker compose -p cca-backend-test -f docker-compose.test.yml exec backend npm run prisma:migrate:deploy
+docker compose -p cca-backend-test -f docker-compose.test.yml exec backend npm run prisma:seed
+docker compose -p cca-backend-test -f docker-compose.test.yml exec backend npm test
+```
+
+Para limpiar el entorno de pruebas:
+
+```bash
+docker compose -p cca-backend-test -f docker-compose.test.yml down -v
+```
+
+El script `deploy/test/deploy.sh` usa el mismo flujo para recrear la BD, aplicar migraciones, sembrar datos y correr la app de pruebas.
+
 ### Despliegue en VPS
 
 Para produccion usamos release por carpeta y rollback seguro.
