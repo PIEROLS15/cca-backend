@@ -186,18 +186,19 @@ El arranque ya no ejecuta migraciones ni seeds automaticamente.
 
 Usa el entorno de test cuando quieras validar cambios antes de desplegar.
 Ese compose usa un nombre de proyecto distinto, asi que no comparte contenedores ni volumenes con tu entorno local.
+Antes de ejecutarlo, crea `.env` desde `.env.example` y completa la seccion de test.
 
 ```bash
-docker compose -p cca-backend-test -f docker-compose.test.yml up -d db backend
-docker compose -p cca-backend-test -f docker-compose.test.yml exec backend npm run prisma:migrate:deploy
-docker compose -p cca-backend-test -f docker-compose.test.yml exec backend npm run prisma:seed
-docker compose -p cca-backend-test -f docker-compose.test.yml exec backend npm test
+docker compose --env-file .env -p cca-backend-test -f docker-compose.test.yml up -d db backend
+docker compose --env-file .env -p cca-backend-test -f docker-compose.test.yml exec backend npm run prisma:migrate:deploy
+docker compose --env-file .env -p cca-backend-test -f docker-compose.test.yml exec backend npm run prisma:seed
+docker compose --env-file .env -p cca-backend-test -f docker-compose.test.yml exec backend npm test
 ```
 
 Para limpiar el entorno de pruebas:
 
 ```bash
-docker compose -p cca-backend-test -f docker-compose.test.yml down -v
+docker compose --env-file .env -p cca-backend-test -f docker-compose.test.yml down -v
 ```
 
 El script `deploy/test/deploy.sh` usa el mismo flujo para recrear la BD, aplicar migraciones, sembrar datos y correr la app de pruebas.
