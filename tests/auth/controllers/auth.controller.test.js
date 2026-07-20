@@ -1,180 +1,157 @@
-const authService = require("../../../src/api/auth/services/auth.service");
-const authController = require("../../../src/api/auth/controllers/auth.controller");
-
-const flush = () => new Promise((resolve) => setImmediate(resolve));
-
-const createRes = () => ({
-  cookie: vi.fn(),
-  clearCookie: vi.fn(),
-  json: vi.fn(),
-});
+const request = require("supertest");
+const app = require("../../../src/app");
+const { refreshAuthUser, createAuthUserFixture, removeAuthUserFixture, makeAuthToken } = require("../auth.test-utils");
 
 describe("auth controller", () => {
-  beforeEach(() => {
-    authService.login = vi.fn();
-    authService.me = vi.fn();
-    authService.updateProfile = vi.fn();
-    authService.changePassword = vi.fn();
-    authService.verifyPassword = vi.fn();
+  let fixture;
+  let token;
+
+  beforeEach(async () => {
+    fixture = await createAuthUserFixture({
+      username: `controller-${Date.now()}`,
+      fullName: "Auth Controller User",
+      email: `controller-${Date.now()}@example.com`,
+      dni: `${Date.now()}`.slice(-8),
+      password: "Secret123!",
+    });
+
+    token = makeAuthToken(fixture.user);
+  });
+
+  afterEach(async () => {
+    await removeAuthUserFixture(fixture?.user?.id);
   });
 
   it("login responde con cookie y usuario", async () => {
-    const req = { body: { username: "admin", password: "secret" } };
-    const res = createRes();
-    const next = vi.fn();
+    const res = await request(app)
+      .post("/api/auth/login")
+      .send({ username: fixture.user.username, password: fixture.password });
 
-    authService.login.mockResolvedValue({ token: "token-123", user: { id: 1, username: "admin" } });
-
-    authController.login(req, res, next);
-    await flush();
-
-    expect(authService.login).toHaveBeenCalledWith({ username: "admin", password: "secret" });
-    expect(res.cookie).toHaveBeenCalledWith(
-      "token",
-      "token-123",
-      expect.objectContaining({ httpOnly: true, sameSite: "lax", path: "/" })
-    );
-    expect(res.json).toHaveBeenCalledWith({ user: { id: 1, username: "admin" } });
-    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(res.body.user).toMatchObject({ id: fixture.user.id, username: fixture.user.username });
+    expect(res.headers["set-cookie"].join(";")).toContain("token=");
   });
 
   it("login rechaza credenciales incompletas", async () => {
-    const req = { body: { username: "admin" } };
-    const res = createRes();
-    const next = vi.fn();
+    const res = await request(app)
+      .post("/api/auth/login")
+      .send({ username: fixture.user.username });
 
-    authController.login(req, res, next);
-    await flush();
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe("username y password son obligatorios");
+  });
 
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400, message: "username y password son obligatorios" }));
-    expect(authService.login).not.toHaveBeenCalled();
-    expect(res.json).not.toHaveBeenCalled();
+  it("login rechaza credenciales invalidas", async () => {
+    const res = await request(app)
+      .post("/api/auth/login")
+      .send({ username: fixture.user.username, password: "wrong-password" });
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toBe("Credenciales invalidas");
   });
 
   it("me responde el usuario autenticado", async () => {
-    const req = { user: { sub: 7 } };
-    const res = createRes();
-    const next = vi.fn();
+    const res = await request(app)
+      .get("/api/auth/me")
+      .set("Authorization", `Bearer ${token}`);
 
-    authService.me.mockResolvedValue({ id: 7, username: "admin" });
-
-    authController.me(req, res, next);
-    await flush();
-
-    expect(authService.me).toHaveBeenCalledWith(7);
-    expect(res.json).toHaveBeenCalledWith({ user: { id: 7, username: "admin" } });
-    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(res.body.user).toMatchObject({ id: fixture.user.id, username: fixture.user.username });
   });
 
   it("logout limpia la cookie de token", async () => {
-    const req = { user: { sub: 7 } };
-    const res = createRes();
-    const next = vi.fn();
+    const res = await request(app)
+      .post("/api/auth/logout")
+      .set("Authorization", `Bearer ${token}`);
 
-    authController.logout(req, res, next);
-    await flush();
-
-    expect(res.clearCookie).toHaveBeenNthCalledWith(
-      1,
-      "token",
-      expect.objectContaining({ httpOnly: true, sameSite: "lax", path: "/" })
-    );
-    expect(res.clearCookie).toHaveBeenNthCalledWith(
-      2,
-      "token",
-      expect.objectContaining({ httpOnly: true, sameSite: "lax", path: "/" })
-    );
-    expect(res.json).toHaveBeenCalledWith({ message: "Sesión cerrada correctamente" });
-    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe("Sesión cerrada correctamente");
+    expect(Array.isArray(res.headers["set-cookie"])).toBe(true);
   });
 
   it("updateProfile normaliza los campos y responde el usuario", async () => {
-    const req = {
-      user: { sub: 9 },
-      body: {
-        fullName: "  Juan Perez  ",
-        username: "  jperez  ",
-        email: "  juan@correo.com  ",
-        dni: " 12345678 ",
-      },
+    const payload = {
+      fullName: `  ${fixture.user.fullName}  `,
+      username: `  ${fixture.user.username}-upd  `,
+      email: `  ${fixture.user.username}-upd@example.com  `,
+      dni: ` ${Number(fixture.user.dni || 0) + 1} `,
     };
-    const res = createRes();
-    const next = vi.fn();
 
-    authService.updateProfile.mockResolvedValue({ id: 9, username: "jperez" });
+    const res = await request(app)
+      .patch("/api/auth/profile")
+      .set("Authorization", `Bearer ${token}`)
+      .send(payload);
 
-    authController.updateProfile(req, res, next);
-    await flush();
-
-    expect(authService.updateProfile).toHaveBeenCalledWith(9, {
-      fullName: "Juan Perez",
-      username: "jperez",
-      email: "juan@correo.com",
-      dni: "12345678",
+    expect(res.status).toBe(200);
+    expect(res.body.user).toMatchObject({
+      id: fixture.user.id,
+      username: `${fixture.user.username}-upd`,
+      fullName: fixture.user.fullName,
+      email: `${fixture.user.username}-upd@example.com`,
     });
-    expect(res.json).toHaveBeenCalledWith({ user: { id: 9, username: "jperez" } });
-    expect(next).not.toHaveBeenCalled();
+
+    const updated = await refreshAuthUser(fixture.user.id);
+    expect(updated).toMatchObject({
+      username: `${fixture.user.username}-upd`,
+      email: `${fixture.user.username}-upd@example.com`,
+    });
   });
 
   it("updateProfile rechaza campos obligatorios faltantes", async () => {
-    const req = { user: { sub: 9 }, body: { username: "jperez" } };
-    const res = createRes();
-    const next = vi.fn();
+    const res = await request(app)
+      .patch("/api/auth/profile")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ username: "only-username" });
 
-    authController.updateProfile(req, res, next);
-    await flush();
-
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400, message: "fullName y username son obligatorios" }));
-    expect(authService.updateProfile).not.toHaveBeenCalled();
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe("fullName y username son obligatorios");
   });
 
   it("changePassword actualiza la contraseña", async () => {
-    const req = { user: { sub: 11 }, body: { currentPassword: "oldpass", newPassword: "newpass" } };
-    const res = createRes();
-    const next = vi.fn();
+    const res = await request(app)
+      .post("/api/auth/change-password")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ currentPassword: fixture.password, newPassword: "NewSecret123!" });
 
-    authController.changePassword(req, res, next);
-    await flush();
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe("Contraseña actualizada correctamente");
 
-    expect(authService.changePassword).toHaveBeenCalledWith(11, { currentPassword: "oldpass", newPassword: "newpass" });
-    expect(res.json).toHaveBeenCalledWith({ message: "Contraseña actualizada correctamente" });
-    expect(next).not.toHaveBeenCalled();
+    const verify = await request(app)
+      .post("/api/auth/verify-password")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ password: "NewSecret123!" });
+
+    expect(verify.status).toBe(200);
+    expect(verify.body.message).toBe("Contraseña verificada correctamente");
   });
 
   it("changePassword rechaza contraseñas nuevas cortas", async () => {
-    const req = { user: { sub: 11 }, body: { currentPassword: "oldpass", newPassword: "12345" } };
-    const res = createRes();
-    const next = vi.fn();
+    const res = await request(app)
+      .post("/api/auth/change-password")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ currentPassword: fixture.password, newPassword: "12345" });
 
-    authController.changePassword(req, res, next);
-    await flush();
-
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400, message: "La nueva contraseña debe tener al menos 6 caracteres" }));
-    expect(authService.changePassword).not.toHaveBeenCalled();
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe("La nueva contraseña debe tener al menos 6 caracteres");
   });
 
   it("verifyPassword confirma la contraseña", async () => {
-    const req = { user: { sub: 13 }, body: { password: "secret" } };
-    const res = createRes();
-    const next = vi.fn();
+    const res = await request(app)
+      .post("/api/auth/verify-password")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ password: fixture.password });
 
-    authController.verifyPassword(req, res, next);
-    await flush();
-
-    expect(authService.verifyPassword).toHaveBeenCalledWith(13, "secret");
-    expect(res.json).toHaveBeenCalledWith({ message: "Contraseña verificada correctamente" });
-    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe("Contraseña verificada correctamente");
   });
 
   it("verifyPassword rechaza el campo password faltante", async () => {
-    const req = { user: { sub: 13 }, body: {} };
-    const res = createRes();
-    const next = vi.fn();
+    const res = await request(app)
+      .post("/api/auth/verify-password")
+      .set("Authorization", `Bearer ${token}`)
+      .send({});
 
-    authController.verifyPassword(req, res, next);
-    await flush();
-
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400, message: "password es obligatorio" }));
-    expect(authService.verifyPassword).not.toHaveBeenCalled();
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe("password es obligatorio");
   });
 });

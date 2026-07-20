@@ -1,93 +1,86 @@
 const bcrypt = require("bcryptjs");
 const prisma = require("../../../src/config/prisma");
 const HttpError = require("../../../src/utils/http-error");
-const authUtils = require("../../../src/api/auth/utils/auth.utils");
 const authService = require("../../../src/api/auth/services/auth.service");
-
-const sampleUser = {
-  id: 1,
-  username: "admin",
-  password: "hashed-password",
-  fullName: "Admin User",
-  email: "admin@example.com",
-  dni: "12345678",
-  isActive: true,
-  role: {
-    id: 2,
-    name: "Admin",
-    description: "Acceso total",
-    rolePermissions: [{ permission: { key: "users.read" } }],
-  },
-};
-
-const sanitizedUser = { id: 1, username: "admin" };
+const { createAuthUserFixture, removeAuthUserFixture, refreshAuthUser } = require("../auth.test-utils");
 
 describe("auth service", () => {
-  beforeEach(() => {
-    prisma.user.findUnique = vi.fn();
-    prisma.user.findFirst = vi.fn();
-    prisma.user.update = vi.fn();
-    bcrypt.compare = vi.fn();
-    bcrypt.hash = vi.fn();
+  let fixture;
+  const extraIds = [];
+
+  beforeEach(async () => {
+    fixture = await createAuthUserFixture({
+      username: `service-${Date.now()}`,
+      fullName: "Auth Service User",
+      email: `service-${Date.now()}@example.com`,
+      dni: `${Date.now()}`.slice(-8),
+      password: "Secret123!",
+      certificateRangeStart: 10,
+      certificateRangeEnd: 20,
+      lastCertificate: 12,
+    });
+  });
+
+  afterEach(async () => {
+    for (const id of extraIds.splice(0)) {
+      await removeAuthUserFixture(id);
+    }
+
+    await removeAuthUserFixture(fixture?.user?.id);
   });
 
   describe("me", () => {
     it("returns the sanitized user", async () => {
-      prisma.user.findUnique.mockResolvedValue(sampleUser);
-
-      await expect(authService.me(1)).resolves.toEqual(authUtils.sanitizeUser(sampleUser));
-
-      expect(prisma.user.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 1 } }));
+      await expect(authService.me(fixture.user.id)).resolves.toMatchObject({
+        id: fixture.user.id,
+        username: fixture.user.username,
+        fullName: fixture.user.fullName,
+        email: fixture.user.email,
+        role: {
+          id: fixture.user.role.id,
+          name: fixture.user.role.name,
+        },
+      });
     });
 
     it("throws when the user does not exist", async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
-
-      await expect(authService.me(1)).rejects.toMatchObject(new HttpError(401, "Usuario no encontrado"));
+      await expect(authService.me(99999999)).rejects.toMatchObject(new HttpError(401, "Usuario no encontrado"));
     });
 
     it("throws when the user is inactive", async () => {
-      prisma.user.findUnique.mockResolvedValue({ ...sampleUser, isActive: false });
+      await prisma.user.update({ where: { id: fixture.user.id }, data: { isActive: false } });
 
-      await expect(authService.me(1)).rejects.toMatchObject(new HttpError(403, "Usuario inactivo"));
+      await expect(authService.me(fixture.user.id)).rejects.toMatchObject(new HttpError(403, "Usuario inactivo"));
     });
   });
 
   describe("login", () => {
     it("returns a token and sanitized user on valid credentials", async () => {
-      prisma.user.findUnique.mockResolvedValue(sampleUser);
-      bcrypt.compare.mockResolvedValue(true);
-
-      await expect(authService.login({ username: "admin", password: "secret" })).resolves.toEqual({
+      await expect(authService.login({ username: fixture.user.username, password: fixture.password })).resolves.toMatchObject({
         token: expect.any(String),
-        user: authUtils.sanitizeUser(sampleUser),
+        user: {
+          id: fixture.user.id,
+          username: fixture.user.username,
+        },
       });
-
-      expect(bcrypt.compare).toHaveBeenCalledWith("secret", sampleUser.password);
     });
 
     it("throws when the username does not exist", async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
-
-      await expect(authService.login({ username: "admin", password: "secret" })).rejects.toMatchObject(
+      await expect(authService.login({ username: "missing-user", password: fixture.password })).rejects.toMatchObject(
         new HttpError(401, "Credenciales invalidas")
       );
     });
 
     it("throws when the password is invalid", async () => {
-      prisma.user.findUnique.mockResolvedValue(sampleUser);
-      bcrypt.compare.mockResolvedValue(false);
-
-      await expect(authService.login({ username: "admin", password: "wrong" })).rejects.toMatchObject(
+      await expect(authService.login({ username: fixture.user.username, password: "wrong-password" })).rejects.toMatchObject(
         new HttpError(401, "Credenciales invalidas")
       );
     });
 
     it("throws when the user is inactive", async () => {
-      prisma.user.findUnique.mockResolvedValue({ ...sampleUser, isActive: false });
-      bcrypt.compare.mockResolvedValue(true);
+      await prisma.user.update({ where: { id: fixture.user.id }, data: { isActive: false } });
 
-      await expect(authService.login({ username: "admin", password: "secret" })).rejects.toMatchObject(
+      await expect(authService.login({ username: fixture.user.username, password: fixture.password })).rejects.toMatchObject(
         new HttpError(403, "Usuario inactivo")
       );
     });
@@ -95,126 +88,124 @@ describe("auth service", () => {
 
   describe("updateProfile", () => {
     it("updates the profile and returns the sanitized user", async () => {
-      prisma.user.findUnique.mockResolvedValueOnce(sampleUser);
-      prisma.user.findUnique.mockResolvedValueOnce(null);
-      prisma.user.findFirst.mockResolvedValueOnce(null);
-      prisma.user.findFirst.mockResolvedValueOnce(null);
-      const updatedUser = { ...sampleUser, username: "jperez", fullName: "Juan Perez", email: "juan@example.com", dni: "87654321" };
-      prisma.user.update.mockResolvedValue(updatedUser);
+      const updated = await authService.updateProfile(fixture.user.id, {
+        fullName: `${fixture.user.fullName} Updated`,
+        username: `${fixture.user.username}-upd`,
+        email: `${fixture.user.username}-upd@example.com`,
+        dni: `${Number(fixture.user.dni || 0) + 1}`,
+      });
 
-      await expect(
-        authService.updateProfile(1, {
-          fullName: "Juan Perez",
-          username: "jperez",
-          email: "juan@example.com",
-          dni: "87654321",
-        })
-      ).resolves.toEqual(authUtils.sanitizeUser(updatedUser));
+      expect(updated).toMatchObject({
+        id: fixture.user.id,
+        username: `${fixture.user.username}-upd`,
+        fullName: `${fixture.user.fullName} Updated`,
+        email: `${fixture.user.username}-upd@example.com`,
+      });
 
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: 1 },
-        data: {
-          fullName: "Juan Perez",
-          username: "jperez",
-          email: "juan@example.com",
-          dni: "87654321",
-        },
-        include: expect.any(Object),
+      await expect(refreshAuthUser(fixture.user.id)).resolves.toMatchObject({
+        username: `${fixture.user.username}-upd`,
       });
     });
 
     it("throws when the user does not exist", async () => {
-      prisma.user.findUnique.mockResolvedValueOnce(null);
-
       await expect(
-        authService.updateProfile(1, { fullName: "Juan Perez", username: "jperez" })
+        authService.updateProfile(99999999, { fullName: "Juan Perez", username: "jperez" })
       ).rejects.toMatchObject(new HttpError(404, "Usuario no encontrado"));
     });
 
     it("throws when the username already exists", async () => {
-      prisma.user.findUnique.mockResolvedValueOnce(sampleUser);
-      prisma.user.findUnique.mockResolvedValueOnce({ id: 2 });
+      const conflict = await createAuthUserFixture({
+        username: `service-conflict-${Date.now()}`,
+        fullName: "Conflict User",
+        email: `conflict-${Date.now()}@example.com`,
+        dni: `${Date.now() + 1}`.slice(-8),
+        password: "Secret123!",
+      });
+      extraIds.push(conflict.user.id);
 
       await expect(
-        authService.updateProfile(1, { fullName: "Juan Perez", username: "jperez" })
+        authService.updateProfile(fixture.user.id, {
+          fullName: "Juan Perez",
+          username: conflict.user.username,
+        })
       ).rejects.toMatchObject(new HttpError(409, "El nombre de usuario ya existe"));
     });
 
     it("throws when the email is already in use", async () => {
-      prisma.user.findUnique.mockResolvedValueOnce(sampleUser);
-      prisma.user.findFirst.mockResolvedValue({ id: 2 });
+      const conflict = await createAuthUserFixture({
+        username: `service-conflict-${Date.now()}`,
+        fullName: "Conflict User",
+        email: `conflict-email-${Date.now()}@example.com`,
+        dni: `${Date.now() + 2}`.slice(-8),
+        password: "Secret123!",
+      });
+      extraIds.push(conflict.user.id);
 
       await expect(
-        authService.updateProfile(1, { fullName: "Juan Perez", username: "admin", email: "juan@example.com" })
+        authService.updateProfile(fixture.user.id, {
+          fullName: "Juan Perez",
+          username: fixture.user.username,
+          email: conflict.user.email,
+        })
       ).rejects.toMatchObject(new HttpError(409, "El email ya esta en uso"));
     });
 
     it("throws when the DNI is already in use", async () => {
-      prisma.user.findUnique.mockResolvedValueOnce(sampleUser);
-      prisma.user.findFirst.mockResolvedValueOnce({ id: 3 });
+      const conflict = await createAuthUserFixture({
+        username: `service-conflict-${Date.now()}`,
+        fullName: "Conflict User",
+        email: `conflict-dni-${Date.now()}@example.com`,
+        dni: `${Date.now() + 3}`.slice(-8),
+        password: "Secret123!",
+      });
+      extraIds.push(conflict.user.id);
 
       await expect(
-        authService.updateProfile(1, { fullName: "Juan Perez", username: "admin", dni: "87654321" })
+        authService.updateProfile(fixture.user.id, {
+          fullName: "Juan Perez",
+          username: fixture.user.username,
+          dni: conflict.user.dni,
+        })
       ).rejects.toMatchObject(new HttpError(409, "El DNI ya esta en uso"));
     });
   });
 
   describe("changePassword", () => {
     it("updates the password when the current password is valid", async () => {
-      prisma.user.findUnique.mockResolvedValue({ id: 1, password: "hashed-password" });
-      bcrypt.compare.mockResolvedValue(true);
-      bcrypt.hash.mockResolvedValue("new-hash");
-      prisma.user.update.mockResolvedValue({});
-
       await expect(
-        authService.changePassword(1, { currentPassword: "secret", newPassword: "newsecret" })
+        authService.changePassword(fixture.user.id, { currentPassword: fixture.password, newPassword: "NewSecret123!" })
       ).resolves.toBeUndefined();
 
-      expect(bcrypt.hash).toHaveBeenCalledWith("newsecret", 10);
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: 1 },
-        data: { password: "new-hash" },
-      });
+      const updated = await prisma.user.findUnique({ where: { id: fixture.user.id }, select: { password: true } });
+      await expect(bcrypt.compare("NewSecret123!", updated.password)).resolves.toBe(true);
     });
 
     it("throws when the user does not exist", async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
-
       await expect(
-        authService.changePassword(1, { currentPassword: "secret", newPassword: "newsecret" })
+        authService.changePassword(99999999, { currentPassword: fixture.password, newPassword: "NewSecret123!" })
       ).rejects.toMatchObject(new HttpError(404, "Usuario no encontrado"));
     });
 
     it("throws when the current password is invalid", async () => {
-      prisma.user.findUnique.mockResolvedValue({ id: 1, password: "hashed-password" });
-      bcrypt.compare.mockResolvedValue(false);
-
       await expect(
-        authService.changePassword(1, { currentPassword: "wrong", newPassword: "newsecret" })
+        authService.changePassword(fixture.user.id, { currentPassword: "wrong-password", newPassword: "NewSecret123!" })
       ).rejects.toMatchObject(new HttpError(400, "La contraseña actual no es correcta"));
     });
   });
 
   describe("verifyPassword", () => {
     it("resolves when the password is valid", async () => {
-      prisma.user.findUnique.mockResolvedValue({ id: 1, password: "hashed-password" });
-      bcrypt.compare.mockResolvedValue(true);
-
-      await expect(authService.verifyPassword(1, "secret")).resolves.toBeUndefined();
-      expect(bcrypt.compare).toHaveBeenCalledWith("secret", "hashed-password");
+      await expect(authService.verifyPassword(fixture.user.id, fixture.password)).resolves.toBeUndefined();
     });
 
     it("throws when the user does not exist", async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
-
-      await expect(authService.verifyPassword(1, "secret")).rejects.toMatchObject(new HttpError(404, "Usuario no encontrado"));
+      await expect(authService.verifyPassword(99999999, fixture.password)).rejects.toMatchObject(
+        new HttpError(404, "Usuario no encontrado")
+      );
     });
 
     it("throws when the password is invalid", async () => {
-      prisma.user.findUnique.mockResolvedValue({ id: 1, password: "hashed-password" });
-      bcrypt.compare.mockResolvedValue(false);
-
-      await expect(authService.verifyPassword(1, "wrong")).rejects.toMatchObject(
+      await expect(authService.verifyPassword(fixture.user.id, "wrong-password")).rejects.toMatchObject(
         new HttpError(400, "La contraseña actual no es correcta")
       );
     });
