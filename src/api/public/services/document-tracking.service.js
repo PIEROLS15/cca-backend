@@ -4,7 +4,7 @@ const certificatesService = require("../../certificates/services/certificates.se
 const certificateRequestsService = require("../../certificate-requests/services/certificate-requests.service");
 const assemblyRecordRequestsService = require("../../assembly-record-requests/services/assembly-record-requests.service");
 const { DOCUMENT_TYPES } = require("../../../utils/document-status-history.utils");
-const { buildTrackingResponse, formatCertificateRequestTypes } = require("../utils/document-tracking.utils");
+const { buildTrackingResponse, formatCertificateRequestTypes, formatDateInLima } = require("../utils/document-tracking.utils");
 const { normalizeComparableText } = require("../../certificate-requests/utils/certificate-request-legacy.utils");
 
 const DOCUMENT_TYPE_ALIASES = {
@@ -111,7 +111,7 @@ const documentLoaders = {
       fields: [
         { label: "Ubicación", value: document.sectorLocation || "" },
         { label: "Tipo de terreno", value: document.terrainType || "" },
-        { label: "Fecha de adjudicación", value: document.awardDate || "" },
+        { label: "Fecha de adjudicación", value: document.awardDate ? formatDateInLima(document.awardDate) : "" },
         { label: "Tiempo de posesión", value: document.possessionTime || "" },
       ],
     }),
