@@ -26,6 +26,17 @@ const formatDateTimeInLima = (value) => {
   ].join("T");
 };
 
+const formatDateInLima = (value) => {
+  if (!value) return null;
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const pad = (n) => String(n).padStart(2, "0");
+
+  return `${pad(date.getUTCDate())}/${pad(date.getUTCMonth() + 1)}/${date.getUTCFullYear()}`;
+};
+
 const CERTIFICATE_TYPES = TRACKING_BASE_STEPS;
 
 const CERTIFICATE_REQUEST_TYPES = TRACKING_BASE_STEPS;
@@ -192,5 +203,6 @@ const buildTrackingResponse = ({
 module.exports = {
   DOCUMENT_TYPE_CONFIG,
   formatCertificateRequestTypes,
+  formatDateInLima,
   buildTrackingResponse,
 };
