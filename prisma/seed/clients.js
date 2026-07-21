@@ -230,4 +230,14 @@ async function seedClients(prisma, api) {
   }
 }
 
-module.exports = { seedClients };
+async function syncClientSequence(prisma) {
+  await prisma.$executeRawUnsafe(`
+    SELECT setval(
+      pg_get_serial_sequence('"Client"', 'id'),
+      COALESCE((SELECT MAX(id) FROM "Client"), 1),
+      (SELECT COUNT(*) > 0 FROM "Client")
+    )
+  `);
+}
+
+module.exports = { seedClients, syncClientSequence };

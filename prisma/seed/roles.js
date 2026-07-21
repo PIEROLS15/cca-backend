@@ -121,4 +121,14 @@ async function seedRoles(prisma, api) {
   }
 }
 
-module.exports = { seedRoles };
+async function syncRoleSequence(prisma) {
+  await prisma.$executeRawUnsafe(`
+    SELECT setval(
+      pg_get_serial_sequence('"Role"', 'id'),
+      COALESCE((SELECT MAX(id) FROM "Role"), 1),
+      (SELECT COUNT(*) > 0 FROM "Role")
+    )
+  `);
+}
+
+module.exports = { seedRoles, syncRoleSequence };
