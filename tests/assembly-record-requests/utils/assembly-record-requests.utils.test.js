@@ -46,6 +46,12 @@ describe("assembly-record-requests utils", () => {
     expect(formatAssemblyRecordRequestStatus("EnProceso")).toBe("En Proceso");
   });
 
+  it("normalizes an attachment label", () => {
+    expect(
+      require("../../../src/api/assembly-record-requests/utils/assembly-record-requests.utils").normalizeAssemblyRecordAttachmentLabel("Certificado de posesion")
+    ).toBe("CertPosesion");
+  });
+
   it("normalizes attachments from a real record", () => {
     expect(normalizeAssemblyRecordAttachments(fixture.attachments, fixture.legacyPayload)).toEqual([
       { type: "CertPosesion" },

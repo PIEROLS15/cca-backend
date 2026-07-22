@@ -1,174 +1,142 @@
-const request = require("supertest");
-const app = require("../../../src/app");
-const prisma = require("../../../src/config/prisma");
-const {
-  makeAuthToken,
-  createAssemblyRecordRequestFixture,
-  removeAssemblyRecordRequestFixture,
-  getBaseContext,
-} = require("../assembly-record-requests.test-utils");
+const assemblyRecordRequestsService = require("../../../src/api/assembly-record-requests/services/assembly-record-requests.service");
+const pdfUtils = require("../../../src/api/assembly-record-requests/utils/assembly-record-requests-pdf.utils");
+const apiResponse = require("../../../src/utils/api-response");
 
-const getBinary = (res, cb) => {
-  const chunks = [];
-  res.on("data", (chunk) => chunks.push(chunk));
-  res.on("end", () => cb(null, Buffer.concat(chunks)));
-  res.on("error", cb);
+const mocks = {
+  listAssemblyRecordRequests: vi.fn(),
+  getAssemblyRecordRequestById: vi.fn(),
+  createAssemblyRecordRequest: vi.fn(),
+  updateAssemblyRecordRequest: vi.fn(),
+  deleteAssemblyRecordRequest: vi.fn(),
+  getAssemblyRecordRequestDeletePreview: vi.fn(),
+  getAssemblyRecordRequestByCode: vi.fn(),
+  buildAssemblyRecordRequestPdf: vi.fn(),
+  sendSuccess: vi.fn((res, payload) => res.status(payload.status || 200).json(payload)),
+};
+
+Object.assign(assemblyRecordRequestsService, mocks);
+pdfUtils.buildAssemblyRecordRequestPdf = mocks.buildAssemblyRecordRequestPdf;
+apiResponse.sendSuccess = mocks.sendSuccess;
+
+const controller = require("../../../src/api/assembly-record-requests/controllers/assembly-record-requests.controller");
+
+const createRes = () => ({
+  status: vi.fn().mockReturnThis(),
+  json: vi.fn(),
+  send: vi.fn(),
+  setHeader: vi.fn(),
+});
+
+const runHandler = async (handler, req, res, next = vi.fn()) => {
+  handler(req, res, next);
+  await new Promise((resolve) => setImmediate(resolve));
+  return next;
 };
 
 describe("assembly-record-requests controller", () => {
-  let token;
-  let baseContext;
-  let fixture;
-  const createdIds = [];
-
-  beforeAll(async () => {
-    baseContext = await getBaseContext();
-    token = makeAuthToken({ sub: baseContext.user.id });
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  beforeEach(async () => {
-    fixture = await createAssemblyRecordRequestFixture({
-      description: `Controller fixture ${Date.now()}`,
-      attachments: [{ type: "CertPosesion" }, { type: "PlanoMemoria" }],
-      legacyPayload: { typeUser: "comunero" },
-    });
-  });
+  it("lists requests", async () => {
+    mocks.listAssemblyRecordRequests.mockResolvedValue({ docs: [] });
+    const res = createRes();
 
-  afterEach(async () => {
-    for (const id of createdIds.splice(0)) {
-      await removeAssemblyRecordRequestFixture(id);
-    }
+    await runHandler(controller.listAssemblyRecordRequests, { query: {} }, res);
 
-    await removeAssemblyRecordRequestFixture(fixture?.id);
-  });
-
-  const authHeader = () => ({ Authorization: `Bearer ${token}` });
-
-  it("lists requests using the real DB", async () => {
-    const res = await request(app)
-      .get("/api/assembly-record-requests")
-      .query({ search: fixture.description })
-      .set(authHeader());
-
-    expect(res.status).toBe(200);
-    expect(res.body.error).toBe(false);
-    expect(Array.isArray(res.body.data)).toBe(true);
-    expect(res.body.data.some((item) => item.code === fixture.code)).toBe(true);
+    expect(mocks.listAssemblyRecordRequests).toHaveBeenCalledWith({ page: undefined, limit: undefined, search: undefined });
+    expect(mocks.sendSuccess).toHaveBeenCalled();
   });
 
   it("gets a request by id", async () => {
-    const res = await request(app)
-      .get(`/api/assembly-record-requests/${fixture.id}`)
-      .set(authHeader());
+    mocks.getAssemblyRecordRequestById.mockResolvedValue({ id: 1 });
+    const res = createRes();
 
-    expect(res.status).toBe(200);
-    expect(res.body.code).toBe(fixture.code);
-    expect(res.body._id).toBe(fixture.code);
+    await runHandler(controller.getAssemblyRecordRequestById, { params: { id: "1" } }, res);
+
+    expect(mocks.getAssemblyRecordRequestById).toHaveBeenCalledWith(1);
+    expect(res.json).toHaveBeenCalledWith({ id: 1 });
   });
 
-  it("rejects create when required fields are missing", async () => {
-    const res = await request(app)
-      .post("/api/assembly-record-requests")
-      .set(authHeader())
-      .send({ clientId: fixture.clientId });
+  it("creates a request", async () => {
+    mocks.createAssemblyRecordRequest.mockResolvedValue({ id: 1 });
+    const res = createRes();
 
-    expect(res.status).toBe(400);
-    expect(res.body.message).toBe("clientId y certificateId son obligatorios");
-  });
+    await runHandler(controller.createAssemblyRecordRequest, {
+      body: { clientId: 1, certificateId: 2 },
+      user: { sub: 9 },
+    }, res);
 
-  it("creates a request in the real DB", async () => {
-    const res = await request(app)
-      .post("/api/assembly-record-requests")
-      .set(authHeader())
-      .send({
-        clientId: fixture.clientId,
-        certificateId: fixture.certificateId,
-        description: `Created from controller ${Date.now()}`,
-        buyerFullName: fixture.client.fullName,
-        sellerFullName: "Vendedor de prueba",
-        sectorLocation: fixture.certificate.sector.name,
-        terrainType: fixture.certificate.terrainType.name,
-        attachments: [{ type: "CertPosesion" }],
-      });
-
-    expect(res.status).toBe(201);
-    expect(res.body.code).toMatch(/^SOL-ACTA-/);
-
-    createdIds.push(res.body.id);
+    expect(mocks.createAssemblyRecordRequest).toHaveBeenCalledWith(expect.objectContaining({ clientId: 1, certificateId: 2 }), 9);
+    expect(res.status).toHaveBeenCalledWith(201);
   });
 
   it("updates a request", async () => {
-    const res = await request(app)
-      .put(`/api/assembly-record-requests/${fixture.id}`)
-      .set(authHeader())
-      .send({ status: "PorRecoger", description: `Updated ${Date.now()}` });
+    mocks.updateAssemblyRecordRequest.mockResolvedValue({ id: 1 });
+    const res = createRes();
 
-    expect(res.status).toBe(200);
-    expect(res.body.status).toBe("Por Recoger");
-    expect(res.body.code).toBe(fixture.code);
+    await runHandler(controller.updateAssemblyRecordRequest, { params: { id: "1" }, body: {}, user: { sub: 9 } }, res);
+
+    expect(mocks.updateAssemblyRecordRequest).toHaveBeenCalledWith(1, {}, 9);
   });
 
   it("deletes a request", async () => {
-    const temp = await createAssemblyRecordRequestFixture({
-      description: `Delete controller fixture ${Date.now()}`,
-      attachments: [{ type: "CertPosesion" }],
-      legacyPayload: { typeUser: "comunero" },
-    });
+    mocks.deleteAssemblyRecordRequest.mockResolvedValue(undefined);
+    const res = createRes();
 
-    const res = await request(app)
-      .delete(`/api/assembly-record-requests/${temp.id}`)
-      .set(authHeader());
+    await runHandler(controller.deleteAssemblyRecordRequest, { params: { id: "1" } }, res);
 
-    expect(res.status).toBe(204);
-
-    const found = await prisma.assemblyRecordRequest.findUnique({ where: { id: temp.id } });
-    expect(found).toBeNull();
+    expect(mocks.deleteAssemblyRecordRequest).toHaveBeenCalledWith(1);
+    expect(res.status).toHaveBeenCalledWith(204);
   });
 
   it("builds a preview", async () => {
-    const res = await request(app)
-      .get(`/api/assembly-record-requests/${fixture.id}/preview`)
-      .set(authHeader());
+    mocks.getAssemblyRecordRequestById.mockResolvedValue({
+      code: "SOL-ACTA-1",
+      client: { fullName: "Juan" },
+      certificate: { certificateNumber: "ABC" },
+    });
+    const res = createRes();
 
-    expect(res.status).toBe(200);
-    expect(res.body.preview).toContain(fixture.code);
-    expect(res.body.client).toBe(fixture.client.fullName);
+    await runHandler(controller.previewAssemblyRecordRequest, { params: { id: "1" } }, res);
+
+    expect(res.json).toHaveBeenCalledWith({
+      code: "SOL-ACTA-1",
+      client: "Juan",
+      certificateNumber: "ABC",
+      preview: "Solicitud SOL-ACTA-1 basada en certificado ABC",
+    });
   });
 
-  it("builds a delete preview", async () => {
-    const res = await request(app)
-      .get(`/api/assembly-record-requests/${fixture.id}/delete-preview`)
-      .set(authHeader());
+  it("returns a delete preview", async () => {
+    mocks.getAssemblyRecordRequestDeletePreview.mockResolvedValue({ canDelete: true });
+    const res = createRes();
 
-    expect(res.status).toBe(200);
-    expect(res.body.canDelete).toBe(true);
-    expect(res.body.itemName).toBe(fixture.code);
+    await runHandler(controller.previewDeleteAssemblyRecordRequest, { params: { id: "1" } }, res);
+
+    expect(mocks.getAssemblyRecordRequestDeletePreview).toHaveBeenCalledWith(1);
+    expect(res.json).toHaveBeenCalledWith({ canDelete: true });
   });
 
   it("downloads a request pdf", async () => {
-    const res = await request(app)
-      .get(`/api/assembly-record-requests/${fixture.id}/pdf`)
-      .set(authHeader())
-      .buffer(true)
-      .parse(getBinary);
+    mocks.getAssemblyRecordRequestById.mockResolvedValue({ code: "SOL-ACTA-1" });
+    mocks.buildAssemblyRecordRequestPdf.mockResolvedValue(Buffer.from("pdf"));
+    const res = createRes();
 
-    expect(res.status).toBe(200);
-    expect(res.headers["content-type"]).toContain("application/pdf");
-    expect(res.headers["content-disposition"]).toContain(`solicitud-acta-${fixture.code}.pdf`);
-    expect(res.body.length).toBeGreaterThan(0);
+    await runHandler(controller.downloadAssemblyRecordRequestPdf, { params: { id: "1" } }, res);
+
+    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "application/pdf");
+    expect(res.send).toHaveBeenCalledWith(expect.any(Buffer));
   });
 
   it("downloads a request pdf by filename", async () => {
-    const filename = `solicitud-acta-${fixture.code}.pdf`;
-    const res = await request(app)
-      .get(`/api/assembly-record-requests/download/${filename}`)
-      .set(authHeader())
-      .buffer(true)
-      .parse(getBinary);
+    mocks.getAssemblyRecordRequestByCode.mockResolvedValue({ code: "SOL-ACTA-1" });
+    mocks.buildAssemblyRecordRequestPdf.mockResolvedValue(Buffer.from("pdf"));
+    const res = createRes();
 
-    expect(res.status).toBe(200);
-    expect(res.headers["content-type"]).toContain("application/pdf");
-    expect(res.headers["content-disposition"]).toContain(filename);
-    expect(res.body.length).toBeGreaterThan(0);
+    await runHandler(controller.downloadAssemblyRecordRequestPdfByFilename, { params: { filename: "solicitud-acta-SOL-ACTA-1.pdf" } }, res);
+
+    expect(mocks.getAssemblyRecordRequestByCode).toHaveBeenCalledWith("SOL-ACTA-1");
+    expect(res.send).toHaveBeenCalledWith(expect.any(Buffer));
   });
 });

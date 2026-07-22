@@ -13,7 +13,7 @@ describe("auth service", () => {
       username: `service-${Date.now()}`,
       fullName: "Auth Service User",
       email: `service-${Date.now()}@example.com`,
-      dni: `${Date.now()}`.slice(-8),
+      dni: `${Math.floor(10000000 + Math.random() * 90000000)}`,
       password: "Secret123!",
       certificateRangeStart: 10,
       certificateRangeEnd: 20,
