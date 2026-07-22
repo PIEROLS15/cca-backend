@@ -96,7 +96,7 @@ docker run --rm --network host \
   -e SEED_LOGIN_PASSWORD="$SEED_LOGIN_PASSWORD_TEST" \
   -e SEED_IMPORTED_USER_PASSWORD="$SEED_IMPORTED_USER_PASSWORD_TEST" \
   -e FORCE_SEEDS="$FORCE_SEEDS_TEST" \
-  "$SEED_IMAGE" sh -lc 'npm run prisma:seed'
+  "$SEED_IMAGE" -lc 'npm run prisma:seed'
 
 log "Ejecutando pruebas"
 COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-cca-backend-test} docker compose --env-file "$ENV_FILE" -f "$APP_COMPOSE_FILE" exec -T backend npm test
