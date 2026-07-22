@@ -70,4 +70,7 @@ fi
 log "Aplicando migraciones y seeds"
 COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-cca-backend-test} docker compose --env-file "$ENV_FILE" -f "$APP_COMPOSE_FILE" exec -T backend sh -lc 'npm run prisma:migrate:deploy && npm run prisma:seed'
 
+log "Ejecutando pruebas"
+COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-cca-backend-test} docker compose --env-file "$ENV_FILE" -f "$APP_COMPOSE_FILE" exec -T backend npm test
+
 log "Despliegue de pruebas completado"
