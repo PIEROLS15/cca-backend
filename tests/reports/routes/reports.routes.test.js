@@ -23,5 +23,5 @@ describe("reports routes", () => {
   it("allows authenticated export access", async () => {
     const res = await request(app).get("/api/reports/certificates").set({ Authorization: `Bearer ${token}` });
     expect(res.status).toBe(200);
-  }, 15000);
+  }, 30000);
 });

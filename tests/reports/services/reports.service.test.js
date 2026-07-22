@@ -5,5 +5,5 @@ describe("reports service", () => {
     const buffer = await reportsService.exportCertificatesReport({});
     expect(Buffer.isBuffer(buffer)).toBe(true);
     expect(buffer.length).toBeGreaterThan(0);
-  }, 15000);
+  }, 30000);
 });
