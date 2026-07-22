@@ -182,6 +182,27 @@ Esto levanta:
 
 El arranque ya no ejecuta migraciones ni seeds automaticamente.
 
+### Pruebas con Docker
+
+Usa el entorno de test cuando quieras validar cambios antes de desplegar.
+Ese compose usa un nombre de proyecto distinto, asi que no comparte contenedores ni volumenes con tu entorno local.
+Antes de ejecutarlo, crea `.env` desde `.env.example` y completa la seccion de test.
+
+```bash
+docker compose --env-file .env -p cca-backend-test -f docker-compose.test.yml up -d db backend
+docker compose --env-file .env -p cca-backend-test -f docker-compose.test.yml exec backend npm run prisma:migrate:deploy
+docker compose --env-file .env -p cca-backend-test -f docker-compose.test.yml exec backend npm run prisma:seed
+docker compose --env-file .env -p cca-backend-test -f docker-compose.test.yml exec backend npm test
+```
+
+Para limpiar el entorno de pruebas:
+
+```bash
+docker compose --env-file .env -p cca-backend-test -f docker-compose.test.yml down -v
+```
+
+El script `deploy/test/deploy.sh` usa el mismo flujo para recrear la BD, aplicar migraciones, sembrar datos y correr la app de pruebas.
+
 ### Despliegue en VPS
 
 Para produccion usamos release por carpeta y rollback seguro.
@@ -264,7 +285,9 @@ El backend incluye un workflow de GitHub Actions en `.github/workflows/ci.yml`.
 5. Generacion del Prisma Client.
 6. Aplicacion de migraciones con `prisma migrate deploy`.
 7. Verificacion de version de Prisma.
-8. Ejecucion condicional de `lint`, `build` y `test` si existen scripts.
+8. Ejecucion condicional de `lint` y `build` si existen scripts.
+
+Los tests de backend se ejecutan en el workflow `backend-test.yml` contra la DB de pruebas del VPS.
 
 ---
 

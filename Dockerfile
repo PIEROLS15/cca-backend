@@ -26,6 +26,8 @@ COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 
 COPY src ./src
+COPY tests ./tests
+COPY vitest.config.js ./vitest.config.js
 COPY package.json ./
 
 EXPOSE 9001

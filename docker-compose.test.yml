@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER_TEST}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_TEST}
+      POSTGRES_DB: ${POSTGRES_DB_TEST}
+      TZ: America/Lima
+      PGTZ: America/Lima
+    ports:
+      - "127.0.0.1:${POSTGRES_TEST_PORT}:5432"
+    volumes:
+      - pgdata-test:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_TEST}"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 40s
+
+  backend:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${BACKEND_TEST_PORT}:9001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      PORT: 9001
+      TZ: America/Lima
+      DATABASE_URL: "postgresql://${POSTGRES_USER_TEST}:${POSTGRES_PASSWORD_TEST}@db:5432/${POSTGRES_DB_TEST}?schema=public"
+      JWT_SECRET: ${JWT_SECRET_TEST}
+      FRONTEND_URL: ${FRONTEND_URL_TEST}
+      TRACKING_FRONTEND_URL: ${TRACKING_FRONTEND_URL_TEST}
+      RENIEC_PROVIDER: ${RENIEC_PROVIDER_TEST}
+      RENIEC_CODART_TOKEN: ${RENIEC_CODART_TOKEN_TEST}
+      RENIEC_CODART_URL: ${RENIEC_CODART_URL_TEST}
+      RENIEC_DECOLECTA_TOKEN: ${RENIEC_DECOLECTA_TOKEN_TEST}
+      RENIEC_DECOLECTA_URL: ${RENIEC_DECOLECTA_URL_TEST}
+      API_BASE_URL: ${API_BASE_URL_TEST}
+      BEARER_TOKEN: ${BEARER_TOKEN_TEST}
+      SEED_LOGIN_USERNAME: ${SEED_LOGIN_USERNAME_TEST}
+      SEED_LOGIN_PASSWORD: ${SEED_LOGIN_PASSWORD_TEST}
+      SEED_IMPORTED_USER_PASSWORD: ${SEED_IMPORTED_USER_PASSWORD_TEST}
+      FORCE_SEEDS: ${FORCE_SEEDS_TEST}
+
+volumes:
+  pgdata-test:

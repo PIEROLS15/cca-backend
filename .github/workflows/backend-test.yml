@@ -1,0 +1,61 @@
+name: Backend Test
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: backend-test
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy and verify backend test env
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      SSH_OPTS: -o ServerAliveInterval=30 -o ServerAliveCountMax=12 -o TCPKeepAlive=yes -o ConnectTimeout=30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Package release
+        run: |
+          tar -czf "$RUNNER_TEMP/backend-test-release.tgz" \
+            --exclude=.git \
+            --exclude=node_modules \
+            --exclude=.env \
+            --exclude=.next \
+            --exclude=.github \
+            --exclude=coverage \
+            .
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_TEST_SSH_KEY }}
+
+      - name: Trust VPS host
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${{ secrets.VPS_TEST_PORT }}" -H "${{ secrets.VPS_TEST_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Prepare remote directories
+        run: |
+          ssh $SSH_OPTS -p "${{ secrets.VPS_TEST_PORT }}" "${{ secrets.VPS_TEST_USER }}@${{ secrets.VPS_TEST_HOST }}" \
+            "mkdir -p '/opt/app/backend-test/releases/${{ github.sha }}' '/opt/app/backend-test/shared'"
+
+      - name: Upload release archive
+        run: |
+          scp $SSH_OPTS -P "${{ secrets.VPS_TEST_PORT }}" "$RUNNER_TEMP/backend-test-release.tgz" \
+            "${{ secrets.VPS_TEST_USER }}@${{ secrets.VPS_TEST_HOST }}:/opt/app/backend-test/releases/${{ github.sha }}.tgz"
+
+      - name: Extract and deploy
+        run: |
+          ssh $SSH_OPTS -p "${{ secrets.VPS_TEST_PORT }}" "${{ secrets.VPS_TEST_USER }}@${{ secrets.VPS_TEST_HOST }}" \
+            "set -e; RELEASE_DIR='/opt/app/backend-test/releases/${{ github.sha }}'; ARCHIVE='/opt/app/backend-test/releases/${{ github.sha }}.tgz'; tar -xzf \"\$ARCHIVE\" -C \"\$RELEASE_DIR\"; rm -f \"\$ARCHIVE\"; cd \"\$RELEASE_DIR\"; sh deploy/test/deploy.sh"
