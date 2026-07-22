@@ -250,6 +250,9 @@ async function seedTerrainTypes(prisma, api) {
     console.log(`  ✓ Tipo de terreno eliminado #${terrainType.id} "${terrainType.name}"`);
   }
 
+  await prisma.$executeRawUnsafe(`SELECT setval(pg_get_serial_sequence('"TerrainTypeConfig"', 'id'), COALESCE((SELECT MAX(id) FROM "TerrainTypeConfig"), 1), true)`);
+  await prisma.$executeRawUnsafe(`SELECT setval(pg_get_serial_sequence('"TerrainType"', 'id'), COALESCE((SELECT MAX(id) FROM "TerrainType"), 1), true)`);
+
   console.log(`  ✓ ${imported} tipos de terreno importados, ${updated} actualizados, ${deleted} eliminados, ${skipped} omitidos`);
 }
 

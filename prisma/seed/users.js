@@ -140,4 +140,14 @@ async function seedUsers(prisma, api) {
   console.log(`  ✓ ${imported} usuarios importados, ${updated} actualizados, ${skipped} omitidos`);
 }
 
-module.exports = { seedUsers };
+async function syncUserSequence(prisma) {
+  await prisma.$executeRawUnsafe(`
+    SELECT setval(
+      pg_get_serial_sequence('"User"', 'id'),
+      COALESCE((SELECT MAX(id) FROM "User"), 1),
+      (SELECT COUNT(*) > 0 FROM "User")
+    )
+  `);
+}
+
+module.exports = { seedUsers, syncUserSequence };

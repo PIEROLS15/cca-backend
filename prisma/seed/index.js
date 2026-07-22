@@ -1,13 +1,14 @@
 require("dotenv").config();
 const { PrismaClient } = require("@prisma/client");
 const { createSeedApiClient } = require("./api-client");
-const { seedRoles } = require("./roles");
-const { seedUsers } = require("./users");
+const { seedRoles, syncRoleSequence } = require("./roles");
+const { seedUsers, syncUserSequence } = require("./users");
 const { seedSectors } = require("./sectors");
 const { seedTerrainTypes } = require("./terrain-types");
-const { seedClients } = require("./clients");
+const { seedClients, syncClientSequence } = require("./clients");
 const { seedCertificateRequests } = require("./certificate-requests");
 const { seedCertificates } = require("./certificates");
+const { assignCertificateRanges } = require("./assign-certificate-ranges");
 const { seedAssemblyRecordRequests } = require("./assembly-record-requests");
 
 const prisma = new PrismaClient();
@@ -30,6 +31,12 @@ const SEEDERS = [
     console.log(`\nEjecutando seed: ${name}`);
     await fn(prisma, api);
   }
+
+  await assignCertificateRanges(prisma);
+  await syncRoleSequence(prisma);
+  await syncUserSequence(prisma);
+  await syncClientSequence(prisma);
+
   console.log("\n✓ Todos los seeds ejecutados exitosamente");
 })().catch((e) => {
   console.error("Error en seed:", e);
