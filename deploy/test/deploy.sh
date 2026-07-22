@@ -86,8 +86,7 @@ log "Aplicando migraciones y seeds"
 COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-cca-backend-test} docker compose --env-file "$ENV_FILE" -f "$APP_COMPOSE_FILE" exec -T backend sh -lc 'npm run prisma:migrate:deploy'
 
 log "Aplicando seed desde red del host"
-SEED_IMAGE=$(COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-cca-backend-test} docker compose --env-file "$ENV_FILE" -f "$APP_COMPOSE_FILE" images -q backend | head -n 1)
-[ -n "$SEED_IMAGE" ] || fail "No se pudo resolver la imagen del backend de pruebas"
+SEED_IMAGE=${SEED_IMAGE:-cca-backend-test-backend:latest}
 
 docker run --rm --network host \
   --entrypoint sh \
