@@ -22,14 +22,29 @@ wait_for_http() {
 }
 
 wait_for_db() {
-  attempts=240
+  attempts=450
   delay=2
   i=1
 
   while [ "$i" -le "$attempts" ]; do
+    db_container_id=$(COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-cca-backend-test} docker compose --env-file "$ENV_FILE" -f "$APP_COMPOSE_FILE" ps -q db 2>/dev/null || true)
+
+    if [ -n "$db_container_id" ]; then
+      db_status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$db_container_id" 2>/dev/null || true)
+
+      if [ "$db_status" = "healthy" ]; then
+        return 0
+      fi
+
+      if [ "$db_status" = "running" ] && docker compose --env-file "$ENV_FILE" -f "$APP_COMPOSE_FILE" exec -T db pg_isready -U "$POSTGRES_USER_TEST" -d "$POSTGRES_DB_TEST" >/dev/null 2>&1; then
+        return 0
+      fi
+    fi
+
     if docker compose --env-file "$ENV_FILE" -f "$APP_COMPOSE_FILE" exec -T db pg_isready -U "$POSTGRES_USER_TEST" -d "$POSTGRES_DB_TEST" >/dev/null 2>&1; then
       return 0
     fi
+
     sleep "$delay"
     i=$((i + 1))
   done
