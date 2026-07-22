@@ -22,7 +22,7 @@ wait_for_http() {
 }
 
 wait_for_db() {
-  attempts=60
+  attempts=150
   delay=2
   i=1
 
