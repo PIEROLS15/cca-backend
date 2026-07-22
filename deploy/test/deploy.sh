@@ -90,6 +90,7 @@ SEED_IMAGE=$(COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-cca-backend-test} dock
 [ -n "$SEED_IMAGE" ] || fail "No se pudo resolver la imagen del backend de pruebas"
 
 docker run --rm --network host \
+  --entrypoint sh \
   -e DATABASE_URL="postgresql://${POSTGRES_USER_TEST}:${POSTGRES_PASSWORD_TEST}@127.0.0.1:${POSTGRES_TEST_PORT:-5433}/${POSTGRES_DB_TEST}?schema=public" \
   -e API_BASE_URL="http://127.0.0.1:${BACKEND_TEST_PORT:-9101}" \
   -e SEED_LOGIN_USERNAME="$SEED_LOGIN_USERNAME_TEST" \
