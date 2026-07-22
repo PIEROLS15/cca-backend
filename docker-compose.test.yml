@@ -25,6 +25,8 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:${BACKEND_TEST_PORT}:9001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       PORT: 9001
       TZ: America/Lima
