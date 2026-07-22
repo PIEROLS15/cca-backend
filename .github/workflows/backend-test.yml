@@ -18,6 +18,10 @@ jobs:
   deploy:
     name: Deploy and verify backend test env
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      SSH_OPTS: -o ServerAliveInterval=30 -o ServerAliveCountMax=12 -o TCPKeepAlive=yes -o ConnectTimeout=30
 
     steps:
       - name: Checkout
@@ -46,15 +50,15 @@ jobs:
 
       - name: Prepare remote directories
         run: |
-          ssh -p "${{ secrets.VPS_TEST_PORT }}" "${{ secrets.VPS_TEST_USER }}@${{ secrets.VPS_TEST_HOST }}" \
+          ssh $SSH_OPTS -p "${{ secrets.VPS_TEST_PORT }}" "${{ secrets.VPS_TEST_USER }}@${{ secrets.VPS_TEST_HOST }}" \
             "mkdir -p '/opt/app/backend-test/releases/${{ github.sha }}' '/opt/app/backend-test/shared'"
 
       - name: Upload release archive
         run: |
-          scp -P "${{ secrets.VPS_TEST_PORT }}" "$RUNNER_TEMP/backend-test-release.tgz" \
+          scp $SSH_OPTS -P "${{ secrets.VPS_TEST_PORT }}" "$RUNNER_TEMP/backend-test-release.tgz" \
             "${{ secrets.VPS_TEST_USER }}@${{ secrets.VPS_TEST_HOST }}:/opt/app/backend-test/releases/${{ github.sha }}.tgz"
 
       - name: Extract and deploy
         run: |
-          ssh -p "${{ secrets.VPS_TEST_PORT }}" "${{ secrets.VPS_TEST_USER }}@${{ secrets.VPS_TEST_HOST }}" \
+          ssh $SSH_OPTS -p "${{ secrets.VPS_TEST_PORT }}" "${{ secrets.VPS_TEST_USER }}@${{ secrets.VPS_TEST_HOST }}" \
             "set -e; RELEASE_DIR='/opt/app/backend-test/releases/${{ github.sha }}'; ARCHIVE='/opt/app/backend-test/releases/${{ github.sha }}.tgz'; tar -xzf \"\$ARCHIVE\" -C \"\$RELEASE_DIR\"; rm -f \"\$ARCHIVE\"; cd \"\$RELEASE_DIR\"; sh deploy/test/deploy.sh"
