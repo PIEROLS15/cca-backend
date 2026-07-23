@@ -28,6 +28,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
+      NODE_ENV: test
       PORT: 9001
       TZ: America/Lima
       DATABASE_URL: "postgresql://${POSTGRES_USER_TEST}:${POSTGRES_PASSWORD_TEST}@db:5432/${POSTGRES_DB_TEST}?schema=public"
