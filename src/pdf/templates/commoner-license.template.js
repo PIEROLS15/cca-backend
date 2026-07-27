@@ -91,8 +91,9 @@ const toQrBuffer = (value) =>
 const toUpperDisplay = (value) => String(value ?? "").toUpperCase();
 
 const buildCommonerLicenseVerificationUrl = (licenseNumber) => {
-  const baseUrl = String(process.env.API_BASE_URL || "http://localhost:9001").replace(/\/$/, "");
-  return `${baseUrl}/api/public/commoner-licenses/${encodeURIComponent(licenseNumber)}`;
+  const raw = String(process.env.FRONTEND_URL || "http://localhost:9000").split(",")[0].trim();
+  const frontendUrl = raw.replace(/\/$/, "");
+  return `${frontendUrl}/comunero/${encodeURIComponent(licenseNumber)}`;
 };
 
 const normalizeLicensesInput = (licenseOrLicenses) => {
