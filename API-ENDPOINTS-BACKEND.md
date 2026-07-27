@@ -467,6 +467,89 @@ Mismo cuerpo que `POST`.
 ### DELETE `/api/clients/:id`
 Borra un cliente si no tiene dependencias.
 
+## Commoner Licenses
+Ruta base: `/api/commoner-licenses`
+
+### GET `/api/commoner-licenses`
+Lista carnets de comunero con paginacion.
+
+Filtros:
+- `search`
+
+Respuesta incluye, entre otros:
+- `dni`
+- `licenseNumber`
+- `fullName`
+- `firstNames`
+- `lastNames`
+- `gender`
+- `birthDate`
+- `address`
+- `hasPhoto`
+- `photoUrl`
+
+### GET `/api/commoner-licenses/search/:term`
+Busca un carnet por DNI, numero de carnet, nombre o apellidos.
+
+### GET `/api/commoner-licenses/:id`
+Devuelve un carnet por ID.
+
+### GET `/api/commoner-licenses/:id/pdf`
+Genera un PDF A4 con la tarjeta del carnet de comunero.
+
+Devuelve `Content-Type: application/pdf`.
+
+### GET `/api/commoner-licenses/pdf`
+Genera un PDF A4 con uno o varios carnets.
+
+Query:
+- `mode=single&id=8`
+- `mode=range&from=4780&to=4820`
+- `mode=list&values=4776,4777,0001`
+- `mode=all`
+- `search` opcional para filtrar antes de imprimir
+
+Notas:
+- `mode=range` usa `field=dni|licenseNumber` para elegir la columna a comparar.
+- `mode=list` acepta una lista separada por comas con DNI o numeros de carnet exactos.
+- `0001` se conserva como texto y no se convierte a numero.
+
+### POST `/api/commoner-licenses`
+Consulta RENIEC/CODART, guarda la foto en disco y registra el carnet.
+
+Body:
+```json
+{ "dni": "73171545", "numeroComunero": "4780" }
+```
+
+### DELETE `/api/commoner-licenses/:id`
+Elimina un carnet y su foto asociada.
+
+### GET `/api/public/commoner-licenses/:licenseNumber`
+Verifica un carnet de comunero para la vista publica QR.
+
+Response:
+```json
+{
+  "message": "Carnet verificado correctamente",
+  "error": false,
+  "status": 200,
+  "data": {
+    "dni": "73171545",
+    "licenseNumber": "4780",
+    "fullName": "ANA LUCIA HUAMAN CASTRO",
+    "firstNames": "ANA LUCIA",
+    "lastNames": "HUAMAN CASTRO",
+    "gender": "FEMENINO",
+    "birthDate": "2003-04-15T00:00:00.000Z",
+    "address": "ANEXO SAN JUAN MZ.A-10 LT.2 LOS GIRASOLES I ETAPA",
+    "photoPath": "/uploads/commoners/dni-73171545-carnet-4780.png",
+    "hasPhoto": true,
+    "photoUrl": "/uploads/commoners/dni-73171545-carnet-4780.png"
+  }
+}
+```
+
 ## Certificate Requests
 Ruta base: `/api/certificate-requests`
 

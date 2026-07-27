@@ -154,6 +154,25 @@ model Commoner {
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 
+model CommonerLicense {
+  id             Int      @id @default(autoincrement())
+  dni            String   @unique
+  licenseNumber  String   @unique
+  fullName       String
+  firstNames     String
+  lastNames      String
+  gender         String
+  birthDate      DateTime
+  address        String
+  photoPath      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([dni])
+  @@index([licenseNumber])
+  @@index([fullName])
+}
+
 model CertificateRequest {
   id                 Int           @id @default(autoincrement())
   requestNumber      String        @unique

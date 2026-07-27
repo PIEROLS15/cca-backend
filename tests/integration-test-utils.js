@@ -8,6 +8,7 @@ const SERIAL_TABLES = [
   "Permission",
   "Client",
   "Commoner",
+  "CommonerLicense",
   "Sector",
   "TerrainTypeConfig",
   "TerrainType",
