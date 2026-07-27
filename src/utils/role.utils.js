@@ -10,6 +10,7 @@ const DEFAULT_ROLES = [
   { name: "Supervisor", description: "Supervisión de procesos" },
   { name: "Asistente", description: "Soporte operativo" },
   { name: "AtencionCliente", description: "Atencion operativa de solicitudes" },
+  { name: "CarnetComuneros", description: "Gestión de carnets de comuneros" },
 ];
 
 const withRoleInclude = {
