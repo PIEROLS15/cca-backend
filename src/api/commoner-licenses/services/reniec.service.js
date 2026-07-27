@@ -13,6 +13,7 @@ const getReniecConfig = () => {
       provider,
       token: process.env.RENIEC_CODART_TOKEN || process.env.RENIEC_TOKEN,
       baseUrl: process.env.RENIEC_CODART_URL || process.env.API_RENIEC_DNI,
+      photoBaseUrl: process.env.RENIEC_CODART_FOTO_URL || process.env.RENIEC_CODART_URL || process.env.API_RENIEC_DNI,
     };
   }
 
@@ -52,14 +53,16 @@ const extractResponse = (data, documentNumber) => {
   };
 };
 
-const searchDetailedByDocument = async (documentNumber) => {
-  const { token, baseUrl } = getReniecConfig();
+const searchDetailedByDocument = async (documentNumber, { withPhoto = false } = {}) => {
+  const { token, baseUrl, photoBaseUrl } = getReniecConfig();
 
-  if (!token || !baseUrl) {
+  const resolvedBaseUrl = withPhoto ? photoBaseUrl : baseUrl;
+
+  if (!token || !resolvedBaseUrl) {
     throw new HttpError(500, "RENIEC no configurado");
   }
 
-  const response = await fetch(`${baseUrl}${documentNumber}`, {
+  const response = await fetch(`${resolvedBaseUrl}${documentNumber}`, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",

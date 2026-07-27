@@ -103,7 +103,7 @@ const createCommonerLicense = async ({ dni, numeroComunero }) => {
     throw new HttpError(409, "Ya existe un carnet registrado con ese DNI o numero de carnet");
   }
 
-  const person = await reniecService.searchDetailedByDocument(normalizedDni);
+  const person = await reniecService.searchDetailedByDocument(normalizedDni, { withPhoto: true });
 
   if (!person.photoDataUri) {
     throw new HttpError(502, "La API no devolvio una foto valida");
