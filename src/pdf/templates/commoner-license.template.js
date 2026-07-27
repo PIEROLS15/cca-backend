@@ -34,12 +34,10 @@ const QR_BOX = { x: 590, y: 245, size: 180 }; // QR reducido y movido a la izqui
 // Posiciones de los valores. Ya NO se fuerza un alineado común entre
 // nombre / DNI / N° de carnet: cada uno tiene su propia posición fija,
 // más grande, y se dibuja de forma independiente.
-const NAME_POS = { x: 550, y: 542, size: 34 };
-// y=619 y y=682 alinean el TOPE de estos valores con el tope de las
-// etiquetas "DNI:" y "N°:" ya impresas en la plantilla (verificado
-// píxel a píxel).
-const DNI_VALUE_POS = { x: 898, y: 619, size: 28 };
-const LICENSE_VALUE_POS = { x: 945, y: 682, size: 36 };
+// Nombre: ver NAME_RIGHT_EDGE más abajo (se alinea a la derecha, con
+// tamaño automático).
+const DNI_VALUE_POS = { x: 898 };
+const LICENSE_VALUE_POS = { x: 945 };
 
 const TEMPLATE_CANDIDATE_PATHS = [
   path.resolve(__dirname, "..", "..", "assets", "commoner-license-template.png"),
@@ -194,24 +192,49 @@ const drawCard = async (doc, license, x, y) => {
 
   // Nombre, DNI y N° de carnet: cada uno con su propia posición y tamaño,
   // sin forzar que compartan un mismo borde de alineación.
-  doc
-    .font("Helvetica")
-    .fontSize(NAME_POS.size)
-    .fillColor("#27704b")
-    .text(`${toUpperDisplay(license.firstNames)} `, NAME_POS.x, NAME_POS.y, { continued: true, lineBreak: false });
-  doc.font("Helvetica-Bold").fontSize(NAME_POS.size).fillColor("#1f5837").text(toUpperDisplay(license.lastNames), { lineBreak: false });
+  // Nombre: alineado a la derecha (pegado al mismo borde que la foto),
+  // más grande — igual que en la imagen de referencia. Si el nombre es
+  // muy largo, se reduce el tamaño automáticamente para no invadir el QR.
+  const NAME_RIGHT_EDGE = 1121;
+  const NAME_MIN_X = 480;
+  let nameFontSize = 38;
+  const nombres = `${toUpperDisplay(license.firstNames)} `;
+  const apellidos = toUpperDisplay(license.lastNames);
+  let nameStartX;
+  for (;;) {
+    doc.font("Helvetica").fontSize(nameFontSize);
+    const wNombres = doc.widthOfString(nombres);
+    doc.font("Helvetica-Bold").fontSize(nameFontSize);
+    const wApellidos = doc.widthOfString(apellidos);
+    nameStartX = NAME_RIGHT_EDGE - (wNombres + wApellidos);
+    if (nameStartX >= NAME_MIN_X || nameFontSize <= 16) break;
+    nameFontSize -= 1;
+  }
+  doc.font("Helvetica").fontSize(nameFontSize).fillColor("#27704b").text(nombres, nameStartX, 542, { continued: true, lineBreak: false });
+  doc.font("Helvetica-Bold").fontSize(nameFontSize).fillColor("#1f5837").text(apellidos, { lineBreak: false });
+
+  // Centrado vertical real contra las etiquetas impresas "DNI:" y "N°:":
+  // doc.text(x, y) posiciona "y" como el TOPE del bloque de texto, no su
+  // centro — por eso mientras más grande la letra, más se corría hacia
+  // abajo respecto a la etiqueta (que es chica y fija). En vez de
+  // adivinar un "y" por tamaño de fuente, centramos matemáticamente
+  // usando el centro vertical medido de cada etiqueta en la plantilla y
+  // un factor de corrección (k) calibrado para Helvetica-Bold.
+  const VCENTER_K = 0.37;
+  const DNI_LABEL_CENTER_Y = 632.5; // centro medido de "DNI:" en la plantilla
+  const LICENSE_LABEL_CENTER_Y = 695.5; // centro medido de "N°:" en la plantilla
+  const dniFontSize = 38;
+  const licenseFontSize = 46;
+  const dniY = DNI_LABEL_CENTER_Y - VCENTER_K * dniFontSize;
+  const licenseY = LICENSE_LABEL_CENTER_Y - VCENTER_K * licenseFontSize;
+
+  doc.font("Helvetica-Bold").fontSize(dniFontSize).fillColor("#1f5837").text(toUpperDisplay(license.dni), DNI_VALUE_POS.x, dniY);
 
   doc
     .font("Helvetica-Bold")
-    .fontSize(DNI_VALUE_POS.size)
+    .fontSize(licenseFontSize)
     .fillColor("#1f5837")
-    .text(toUpperDisplay(license.dni), DNI_VALUE_POS.x, DNI_VALUE_POS.y);
-
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(LICENSE_VALUE_POS.size)
-    .fillColor("#1f5837")
-    .text(toUpperDisplay(license.licenseNumber), LICENSE_VALUE_POS.x, LICENSE_VALUE_POS.y);
+    .text(toUpperDisplay(license.licenseNumber), LICENSE_VALUE_POS.x, licenseY);
 
   doc.restore();
 };
