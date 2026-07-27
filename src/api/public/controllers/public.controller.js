@@ -2,11 +2,23 @@ const asyncHandler = require("../../../utils/async-handler");
 const { sendSuccess } = require("../../../utils/api-response");
 const certificatesService = require("../../certificates/services/certificates.service");
 const documentTrackingService = require("../services/document-tracking.service");
+const commonerLicenseVerificationService = require("../services/commoner-license-verification.service");
 
 const verifyCertificate = asyncHandler(async (req, res) => {
   const data = await certificatesService.getCertificateVerificationByToken(req.params.token);
   return sendSuccess(res, {
     message: "Certificado verificado correctamente",
+    data,
+  });
+});
+
+const verifyCommonerLicense = asyncHandler(async (req, res) => {
+  const data = await commonerLicenseVerificationService.getCommonerLicenseVerificationByLicenseNumber(
+    req.params.licenseNumber,
+  );
+
+  return sendSuccess(res, {
+    message: "Carnet verificado correctamente",
     data,
   });
 });
@@ -25,5 +37,6 @@ const trackDocument = asyncHandler(async (req, res) => {
 
 module.exports = {
   verifyCertificate,
+  verifyCommonerLicense,
   trackDocument,
 };
