@@ -3,13 +3,15 @@ const ROLE_GROUPS = [
   { group: 2, roles: ["Presidente", "Ingeniero"] },
   { group: 3, roles: ["Secretaria", "Supervisor"] },
   { group: 4, roles: ["Asistente", "AtencionCliente"] },
+  { group: 5, roles: ["CarnetComuneros"] },
 ];
 
 const MODULE_ACCESS_BY_GROUP = {
   1: ["dashboard", "roles", "users", "sectors", "terrain-types", "clients", "commoner-licenses", "certificate-requests", "certificates", "assembly-record-requests", "reports"],
   2: ["dashboard", "roles", "users", "sectors", "terrain-types", "clients", "commoner-licenses", "certificate-requests", "certificates", "assembly-record-requests", "reports"],
-  3: ["dashboard", "roles", "sectors", "terrain-types", "clients", "commoner-licenses", "certificate-requests", "certificates", "assembly-record-requests", "reports"],
-  4: ["dashboard", "clients", "commoner-licenses", "certificate-requests", "assembly-record-requests"],
+  3: ["dashboard", "roles", "sectors", "terrain-types", "clients", "certificate-requests", "certificates", "assembly-record-requests", "reports"],
+  4: ["dashboard", "clients", "certificate-requests", "assembly-record-requests"],
+  5: ["commoner-licenses"],
 };
 
 const normalizeRoleName = (value) =>
