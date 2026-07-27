@@ -7,9 +7,13 @@ const bwipjs = require("bwip-js");
 const PAGE_WIDTH = 595.28; // 210mm
 const PAGE_HEIGHT = 841.89; // 297mm
 
-// ── TARJETA CR80 REAL: 85.6 x 53.98 mm ───────────────────────────────────
-const CARD_WIDTH = (85.6 * 72) / 25.4;
-const CARD_HEIGHT = (53.98 * 72) / 25.4;
+// ── TARJETA: 7.8 x 5 cm ───────────────────────────────────────────────────
+// Nuevo tamaño de carnet: 7.8cm (lado largo) x 5cm (lado corto). Se
+// mantiene en orientación horizontal porque es la que coincide con el
+// diseño de la plantilla (ratio ~1.56, muy cercano al 1.595 nativo del
+// PNG) — si en realidad la necesitas vertical avísame y giro la lógica.
+const CARD_WIDTH = (78 * 72) / 25.4;
+const CARD_HEIGHT = (50 * 72) / 25.4;
 
 // ── GRILLA DE IMPRESIÓN: 2 columnas x 5 filas = 10 carnets por hoja ─────
 const MARGIN = (10 * 72) / 25.4; // 10mm de margen para guías de corte
@@ -136,7 +140,7 @@ const drawCard = async (doc, license, x, y) => {
   doc.translate(x, y);
 
   // Encaja el lienzo de diseño (1158x726) dentro de la tarjeta física
-  // (85.6x53.98mm). Los ratios son casi idénticos (1.595 vs 1.585), así
+  // (7.8x5cm). Los ratios son cercanos (1.595 de la plantilla vs 1.56 de
   // que el letterbox resultante es de menos de 1pt — imperceptible.
   const scale = Math.min(CARD_WIDTH / TEMPLATE_WIDTH, CARD_HEIGHT / TEMPLATE_HEIGHT);
   const contentW = TEMPLATE_WIDTH * scale;
@@ -224,8 +228,8 @@ const drawCard = async (doc, license, x, y) => {
   const VCENTER_K = 0.37;
   const DNI_LABEL_CENTER_Y = 632.5; // centro medido de "DNI:" en la plantilla
   const LICENSE_LABEL_CENTER_Y = 695.5; // centro medido de "N°:" en la plantilla
-  const dniFontSize = 38;
-  const licenseFontSize = 46;
+  const dniFontSize = 42;
+  const licenseFontSize = 50;
   const dniY = DNI_LABEL_CENTER_Y - VCENTER_K * dniFontSize;
   const licenseY = LICENSE_LABEL_CENTER_Y - VCENTER_K * licenseFontSize;
 
