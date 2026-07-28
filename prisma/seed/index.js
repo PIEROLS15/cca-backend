@@ -10,6 +10,7 @@ const { seedCertificateRequests } = require("./certificate-requests");
 const { seedCertificates } = require("./certificates");
 const { assignCertificateRanges } = require("./assign-certificate-ranges");
 const { seedAssemblyRecordRequests } = require("./assembly-record-requests");
+const { seedCommonerLicenses, syncCommonerLicenseSequence } = require("./commoner-licenses");
 
 const prisma = new PrismaClient();
 
@@ -21,6 +22,7 @@ const SEEDERS = [
   { name: "Tipos de terreno", fn: seedTerrainTypes },
   { name: "Solicitudes de certificados", fn: seedCertificateRequests },
   { name: "Certificados", fn: seedCertificates },
+  { name: "Carnets de comunero", fn: seedCommonerLicenses },
   { name: "Solicitudes de acta de asamblea", fn: seedAssemblyRecordRequests },
 ];
 
@@ -36,6 +38,7 @@ const SEEDERS = [
   await syncRoleSequence(prisma);
   await syncUserSequence(prisma);
   await syncClientSequence(prisma);
+  await syncCommonerLicenseSequence(prisma);
 
   console.log("\n✓ Todos los seeds ejecutados exitosamente");
 })().catch((e) => {

@@ -263,6 +263,7 @@ Los siguientes datos se importan con `docker compose exec backend npm run prisma
 | Usuarios anteriores | JSON local (`prisma/seed/users-data.json`) | 14 |
 | Solicitudes de certificados | API externa (paginada) | ~3400 |
 | Certificados | API externa (paginada) | ~9200 |
+| Carnets de comunero | API externa (paginada + fotos) | variable |
 | Solicitudes de acta de asamblea | API externa (paginada) | ~80 |
 
 ---
