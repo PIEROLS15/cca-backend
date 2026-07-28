@@ -85,16 +85,16 @@ fi
 log "Aplicando migraciones y seeds"
 COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-cca-backend-test} docker compose --env-file "$ENV_FILE" -f "$APP_COMPOSE_FILE" exec -T backend sh -lc 'npm run prisma:migrate:deploy'
 
-log "Aplicando seed desde red del host"
+log "Aplicando seed desde produccion"
 SEED_IMAGE=${SEED_IMAGE:-cca-backend-test-backend:latest}
 
 docker run --rm --network host \
   --entrypoint sh \
   -e DATABASE_URL="postgresql://${POSTGRES_USER_TEST}:${POSTGRES_PASSWORD_TEST}@127.0.0.1:${POSTGRES_TEST_PORT:-5433}/${POSTGRES_DB_TEST}?schema=public" \
-  -e API_BASE_URL="http://127.0.0.1:${BACKEND_TEST_PORT:-9101}" \
-  -e SEED_LOGIN_USERNAME="$SEED_LOGIN_USERNAME_TEST" \
-  -e SEED_LOGIN_PASSWORD="$SEED_LOGIN_PASSWORD_TEST" \
-  -e SEED_IMPORTED_USER_PASSWORD="$SEED_IMPORTED_USER_PASSWORD_TEST" \
+  -e API_BASE_URL="$API_BASE_URL" \
+  -e SEED_LOGIN_USERNAME="$SEED_LOGIN_USERNAME" \
+  -e SEED_LOGIN_PASSWORD="$SEED_LOGIN_PASSWORD" \
+  -e SEED_IMPORTED_USER_PASSWORD="$SEED_IMPORTED_USER_PASSWORD" \
   -e FORCE_SEEDS="$FORCE_SEEDS_TEST" \
   "$SEED_IMAGE" -lc 'npm run prisma:seed'
 
