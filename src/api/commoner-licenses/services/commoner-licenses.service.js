@@ -32,9 +32,42 @@ const buildSearchWhere = (search) => {
   };
 };
 
-const listCommonerLicenses = async ({ page, limit, search } = {}) => {
+const buildRangeWhere = (rangeField, rangeFrom, rangeTo) => {
+  const field = rangeField === "dni" ? "dni" : "licenseNumber";
+  const from = String(rangeFrom || "").trim();
+  const to = String(rangeTo || "").trim();
+
+  if (!from && !to) return {};
+
+  if (from && to) {
+    const [min, max] = from <= to ? [from, to] : [to, from];
+    return { [field]: { gte: min, lte: max } };
+  }
+
+  if (from) return { [field]: { gte: from } };
+  return { [field]: { lte: to } };
+};
+
+const listCommonerLicenses = async ({ page, limit, search, rangeField, rangeFrom, rangeTo } = {}) => {
+  const where = { ...buildSearchWhere(search), ...buildRangeWhere(rangeField, rangeFrom, rangeTo) };
+  const hasRange = Boolean(rangeFrom || rangeTo);
+
+  if (hasRange) {
+    const docs = await prisma.commonerLicense.findMany({
+      where,
+      orderBy: [{ licenseNumber: "asc" }, { id: "asc" }],
+    });
+
+    const formatted = formatCommonerLicenseCollection(docs);
+    return buildPaginationResult({
+      docs: formatted,
+      total: formatted.length,
+      page: 1,
+      limit: formatted.length,
+    });
+  }
+
   const pagination = getPaginationParams({ page, limit });
-  const where = buildSearchWhere(search);
 
   const [docs, total] = await Promise.all([
     prisma.commonerLicense.findMany({
