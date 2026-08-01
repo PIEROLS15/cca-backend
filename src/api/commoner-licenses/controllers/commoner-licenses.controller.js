@@ -11,6 +11,9 @@ const listCommonerLicenses = asyncHandler(async (req, res) => {
     page: req.query.page,
     limit: req.query.limit,
     search: req.query.search,
+    rangeField: req.query.rangeField,
+    rangeFrom: req.query.rangeFrom,
+    rangeTo: req.query.rangeTo,
   });
 
   return sendSuccess(res, {
