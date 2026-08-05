@@ -188,6 +188,40 @@ const deleteCommonerLicense = async (id) => {
   await removeFileIfExists(filePath);
 };
 
+const VALID_STATUSES = ["Sin entregar", "Entregado"];
+
+const updateCommonerLicenseStatus = async (id, status) => {
+  if (!VALID_STATUSES.includes(status)) {
+    throw new HttpError(400, `Estado invalido. Valores permitidos: ${VALID_STATUSES.join(", ")}`);
+  }
+
+  const current = await prisma.commonerLicense.findUnique({ where: { id } });
+
+  if (!current) {
+    throw new HttpError(404, "Carnet de comunero no encontrado");
+  }
+
+  const updated = await prisma.commonerLicense.update({
+    where: { id },
+    data: { status },
+  });
+
+  return formatCommonerLicenseResponse(updated);
+};
+
+const listAllCommonerLicensesForReport = async ({ search, status } = {}) => {
+  const where = { ...buildSearchWhere(search) };
+
+  if (status && VALID_STATUSES.includes(status)) {
+    where.status = status;
+  }
+
+  return formatCommonerLicenseCollection(await prisma.commonerLicense.findMany({
+    where,
+    orderBy: [{ licenseNumber: "asc" }, { id: "asc" }],
+  }));
+};
+
 module.exports = {
   listCommonerLicenses,
   listAllCommonerLicenses,
@@ -195,4 +229,6 @@ module.exports = {
   searchCommonerLicenses,
   createCommonerLicense,
   deleteCommonerLicense,
+  updateCommonerLicenseStatus,
+  listAllCommonerLicensesForReport,
 };

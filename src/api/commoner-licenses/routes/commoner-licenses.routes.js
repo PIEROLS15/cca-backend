@@ -13,6 +13,7 @@ router.get("/pdf", commonerLicensesController.downloadCommonerLicensesPdf);
 router.get("/:id/pdf", commonerLicensesController.downloadCommonerLicensePdf);
 router.get("/:id", commonerLicensesController.getCommonerLicenseById);
 router.post("/", commonerLicensesController.createCommonerLicense);
+router.put("/:id", commonerLicensesController.updateCommonerLicenseStatus);
 router.delete("/:id", commonerLicensesController.deleteCommonerLicense);
 
 module.exports = router;

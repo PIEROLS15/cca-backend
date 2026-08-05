@@ -1,6 +1,7 @@
 const prisma = require("../../../config/prisma");
 const { buildCertificateFilters } = require("../../certificates/utils/certificates.utils");
-const { buildCertificatesWorkbook } = require("../utils/reports.utils");
+const commonerLicensesService = require("../../commoner-licenses/services/commoner-licenses.service");
+const { buildCertificatesWorkbook, buildCommonerLicensesWorkbook } = require("../utils/reports.utils");
 
 const exportCertificatesReport = async (query) => {
   const where = buildCertificateFilters(query);
@@ -23,6 +24,16 @@ const exportCertificatesReport = async (query) => {
   return buildCertificatesWorkbook(certificates);
 };
 
+const exportCommonerLicensesReport = async (query) => {
+  const licenses = await commonerLicensesService.listAllCommonerLicensesForReport({
+    search: query.search,
+    status: query.status,
+  });
+
+  return buildCommonerLicensesWorkbook(licenses);
+};
+
 module.exports = {
   exportCertificatesReport,
+  exportCommonerLicensesReport,
 };

@@ -72,6 +72,24 @@ const deleteCommonerLicense = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
+const updateCommonerLicenseStatus = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  if (Number.isNaN(id)) {
+    throw new HttpError(400, "ID invalido");
+  }
+
+  const { status } = req.body;
+  if (!status) {
+    throw new HttpError(400, "Debes enviar el campo status");
+  }
+
+  const updated = await commonerLicensesService.updateCommonerLicenseStatus(id, status);
+  return sendSuccess(res, {
+    message: `Estado cambiado a "${status}"`,
+    data: updated,
+  });
+});
+
 const toPositiveInteger = (value) => {
   const text = String(value ?? "").trim();
   if (!/^\d+$/.test(text)) return null;
@@ -242,6 +260,7 @@ module.exports = {
   getCommonerLicenseById,
   createCommonerLicense,
   deleteCommonerLicense,
+  updateCommonerLicenseStatus,
   downloadCommonerLicensePdf,
   downloadCommonerLicensesPdf,
 };
