@@ -64,6 +64,46 @@ const buildCertificatesWorkbook = (certificates) => {
   return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
 };
 
+const buildCommonerLicensesWorkbook = (licenses) => {
+  const headers = [
+    "DNI",
+    "N° Carnet",
+    "Nombres Completos",
+    "Estado",
+    "Fecha",
+    "Hora",
+  ];
+  const rows = licenses.map((license) => {
+    const date = new Date(license.createdAt);
+    const dateStr = Number.isNaN(date.getTime()) ? "" : `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+    const timeStr = Number.isNaN(date.getTime()) ? "" : `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    return [
+      license.dni,
+      license.licenseNumber,
+      license.fullName || "",
+      license.status || "Sin entregar",
+      dateStr,
+      timeStr,
+    ];
+  });
+
+  const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  worksheet["!cols"] = [
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 38 },
+    { wch: 16 },
+    { wch: 12 },
+    { wch: 10 },
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Carnets Comuneros");
+
+  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+};
+
 module.exports = {
   buildCertificatesWorkbook,
+  buildCommonerLicensesWorkbook,
 };

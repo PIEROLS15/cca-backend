@@ -12,6 +12,18 @@ const exportCertificatesReport = asyncHandler(async (req, res) => {
   res.send(fileBuffer);
 });
 
+const exportCommonerLicensesReport = asyncHandler(async (req, res) => {
+  const fileBuffer = await reportsService.exportCommonerLicensesReport(req.query);
+
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+  res.setHeader("Content-Disposition", 'attachment; filename="reporte-carnets.xlsx"');
+  res.send(fileBuffer);
+});
+
 module.exports = {
   exportCertificatesReport,
+  exportCommonerLicensesReport,
 };
