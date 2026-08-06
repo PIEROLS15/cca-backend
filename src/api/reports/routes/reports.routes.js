@@ -7,5 +7,6 @@ const router = express.Router();
 
 router.use(authRequired, requireModuleAccess("reports"));
 router.get("/certificates", reportsController.exportCertificatesReport);
+router.get("/commoner-licenses", reportsController.exportCommonerLicensesReport);
 
 module.exports = router;

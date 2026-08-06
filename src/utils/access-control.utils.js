@@ -11,7 +11,7 @@ const MODULE_ACCESS_BY_GROUP = {
   2: ["dashboard", "roles", "users", "sectors", "terrain-types", "clients", "commoner-licenses", "certificate-requests", "certificates", "assembly-record-requests", "reports"],
   3: ["dashboard", "roles", "sectors", "terrain-types", "clients", "certificate-requests", "certificates", "assembly-record-requests", "reports"],
   4: ["dashboard", "clients", "certificate-requests", "assembly-record-requests"],
-  5: ["commoner-licenses"],
+  5: ["commoner-licenses", "reports"],
 };
 
 const normalizeRoleName = (value) =>
