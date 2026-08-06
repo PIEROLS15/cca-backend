@@ -209,19 +209,6 @@ const updateCommonerLicenseStatus = async (id, status) => {
   return formatCommonerLicenseResponse(updated);
 };
 
-const listAllCommonerLicensesForReport = async ({ search, status } = {}) => {
-  const where = { ...buildSearchWhere(search) };
-
-  if (status && VALID_STATUSES.includes(status)) {
-    where.status = status;
-  }
-
-  return formatCommonerLicenseCollection(await prisma.commonerLicense.findMany({
-    where,
-    orderBy: [{ licenseNumber: "asc" }, { id: "asc" }],
-  }));
-};
-
 module.exports = {
   listCommonerLicenses,
   listAllCommonerLicenses,
@@ -230,5 +217,4 @@ module.exports = {
   createCommonerLicense,
   deleteCommonerLicense,
   updateCommonerLicenseStatus,
-  listAllCommonerLicensesForReport,
 };
