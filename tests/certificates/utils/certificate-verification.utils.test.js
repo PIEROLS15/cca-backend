@@ -9,7 +9,7 @@ describe("certificate verification utils", () => {
       verificationToken: "abc",
       certificateNumber: "001",
       owners: [{ fullName: "Juan", documentNumber: "123" }],
-      terrain: { terrainType: { name: "Lote" }, width: 10 },
+      terrain: { terrainType: { name: "Lote" }, width: 10, measurementModeUsed: "RECTANGULAR_AUTO" },
       location: { sectors: { name: "Sector" }, mz: "A", lot: "1" },
       borders: { north: "N" },
       additionalNotes: "Nota",
@@ -18,6 +18,7 @@ describe("certificate verification utils", () => {
 
     expect(payload.verificationToken).toBe("abc");
     expect(payload.certificate.certificateNumber).toBe("001");
+    expect(payload.certificate.measurementModeUsed).toBe("RECTANGULAR_AUTO");
   });
 
   it("builds a verification url", () => {
