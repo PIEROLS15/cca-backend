@@ -23,6 +23,7 @@ const buildCertificateSnapshot = (certificate) => ({
     .filter(Boolean)
     .join(", "),
   terrainType: normalizeText(certificate.terrain?.terrainType?.name),
+  measurementModeUsed: normalizeText(certificate.terrain?.measurementModeUsed) || null,
   sector: normalizeText(certificate.location?.sectors?.name),
   width: toNumber(certificate.terrain?.width),
   length: toNumber(certificate.terrain?.length),
