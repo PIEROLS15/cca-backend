@@ -4,6 +4,15 @@ const { buildCertificateVerificationUrl } = require("../../api/certificates/util
 
 const WIDTH = 595.28;
 const HEIGHT = 841.89;
+const CM_TO_POINTS = 28.3464567;
+const HEADER_CODE_X = 14.5 * CM_TO_POINTS;
+const HEADER_CODE_Y = 0.7 * CM_TO_POINTS;
+const HEADER_CODE_RIGHT_MARGIN = 1.5 * CM_TO_POINTS;
+const HEADER_CODE_WIDTH = WIDTH - HEADER_CODE_X - HEADER_CODE_RIGHT_MARGIN;
+const HEADER_CODE_COLOR = "#d46f79";
+const HEADER_CODE_MAX_FONT_SIZE = 11;
+const HEADER_CODE_MIN_FONT_SIZE = 8;
+const HEADER_CODE_FONT = "Courier-Bold"; // monoespaciada, la más cercana a un sello numerador entre las 14 estándar de PDFKit
 
 const toUpperDisplay = (value) => String(value ?? "").toUpperCase();
 
@@ -28,6 +37,28 @@ const toQrBuffer = (value) =>
 const hasValue = (value) => value !== null && value !== undefined && value !== "";
 
 const formatTwoDecimals = (value) => (hasValue(value) ? Number(value).toFixed(2) : "");
+
+const formatHeaderCode = (code) => `Nº ${toUpperDisplay(code)} C.C.A.`;
+
+const drawHeaderCode = (doc, code) => {
+  const text = formatHeaderCode(code);
+  let fontSize = HEADER_CODE_MAX_FONT_SIZE;
+
+  doc.font(HEADER_CODE_FONT);
+  for (; fontSize >= HEADER_CODE_MIN_FONT_SIZE; fontSize -= 1) {
+    doc.fontSize(fontSize);
+    if (doc.widthOfString(text) <= HEADER_CODE_WIDTH) break;
+  }
+
+  doc.fillColor(HEADER_CODE_COLOR).fillOpacity(1);
+  doc.text(text, HEADER_CODE_X, HEADER_CODE_Y, {
+    width: HEADER_CODE_WIDTH,
+    align: "right",
+    lineBreak: false,
+  });
+
+  doc.fillColor("#000000");
+};
 
 const buildPossessionSegments = (certificate) => {
   const terrain = certificate.terrain || {};
@@ -172,6 +203,8 @@ const buildCertificatePdf = async (certificate) => {
       doc.rect(0, 0, WIDTH, HEIGHT).fill("#ffffff");
       doc.fillColor("#000000");
 
+      drawHeaderCode(doc, code);
+
       doc.font("Times-Bold").fontSize(20);
       doc.text("CERTIFICADO DE POSESIÓN", 0, 168, { align: "center", width: WIDTH });
 
@@ -294,4 +327,4 @@ const buildCertificatePdf = async (certificate) => {
   });
 };
 
-module.exports = { buildCertificatePdf };
+module.exports = { buildCertificatePdf, drawHeaderCode, formatHeaderCode };
