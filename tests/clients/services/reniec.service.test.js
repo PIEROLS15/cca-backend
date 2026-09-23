@@ -37,4 +37,31 @@ describe("reniec service", () => {
       address: "",
     });
   });
+
+  it("normalizes current CODART response data", async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          first_name: "WILLIAM ROBERT",
+          first_last_name: "TACILLA",
+          second_last_name: "LLANOS",
+          full_name: "WILLIAM ROBERT TACILLA LLANOS",
+          document_number: "40355297",
+          extras: {
+            domicilio: {
+              direccion: "ASENT.H. ROSARIO DE ASIA MZ. I LT. 02",
+            },
+          },
+        },
+      }),
+    });
+
+    await expect(reniecService.searchByDocument("40355297")).resolves.toEqual({
+      fullName: "William Robert Tacilla Llanos",
+      documentNumber: "40355297",
+      address: "ASENT.H. ROSARIO DE ASIA MZ. I LT. 02",
+    });
+  });
 });

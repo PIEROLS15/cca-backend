@@ -10,6 +10,19 @@ const normalizeAddress = (value) => {
   return address.toLowerCase() === "data in credit" ? "" : address;
 };
 
+const extractResponse = (data, documentNumber) => {
+  const result = data?.data ?? data?.result ?? data ?? {};
+  const firstNames = String(result?.nombres || result?.first_name || "").trim();
+  const lastNames = String(result?.apellidos || [result?.first_last_name, result?.second_last_name].filter(Boolean).join(" ") || "").trim();
+  const fullName = String(result?.full_name || [firstNames, lastNames].filter(Boolean).join(" ") || "").trim();
+
+  return {
+    fullName: titleCase(fullName),
+    documentNumber: result?.dni?.numero || result?.document_number || documentNumber,
+    address: normalizeAddress(result?.domicilio?.direccion || result?.extras?.domicilio?.direccion || result?.address),
+  };
+};
+
 const getReniecConfig = () => {
   const provider = String(process.env.RENIEC_PROVIDER || "codart").toLowerCase();
 
@@ -58,19 +71,7 @@ const searchByDocument = async (documentNumber) => {
     throw new HttpError(404, data?.message || "No se encontraron datos para el DNI ingresado");
   }
 
-  const result = data?.result ?? data;
-
-  const fullName = [result.first_name, result.first_last_name, result.second_last_name]
-    .filter(Boolean)
-    .join(" ")
-    || result.full_name
-    || "";
-
-  return {
-    fullName: titleCase(fullName),
-    documentNumber: result.document_number || documentNumber,
-    address: normalizeAddress(result.address),
-  };
+  return extractResponse(data, documentNumber);
 };
 
 module.exports = { searchByDocument };
