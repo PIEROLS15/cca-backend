@@ -156,7 +156,7 @@ const assertCertificateRangeRespectsLast = ({ start, end, lastCertificate }) => 
     throw new HttpError(409, "No se puede quitar el limite de certificados cuando ya existen certificados emitidos");
   }
 
-  if (lastCertificate < start || lastCertificate > end) {
+  if (lastCertificate > end) {
     throw new HttpError(409, "El ultimo certificado emitido queda fuera del nuevo rango");
   }
 };
