@@ -102,4 +102,56 @@ describe("users service", () => {
       await removeAuthUserFixture(created.id);
     }
   });
+
+  it("allows moving a certificate limit to a future range", async () => {
+    const base = Math.floor(800000 + Math.random() * 100000);
+    const created = await createAuthUserFixture({
+      role: targetRole,
+      username: uniqueValue("future-range"),
+      fullName: `Usuario rango futuro ${uniqueValue("x")}`,
+      email: `${uniqueValue("future-range")}@example.com`,
+      dni: `${Math.floor(10000000 + Math.random() * 90000000)}`,
+      certificateRangeStart: base,
+      certificateRangeEnd: base + 999,
+      lastCertificate: base + 999,
+    });
+
+    try {
+      const updated = await usersService.updateUser(created.user.id, {
+        certificateRangeStart: base + 1000,
+        certificateRangeEnd: base + 1500,
+      }, "Admin");
+
+      expect(updated.certificateRangeStart).toBe(base + 1000);
+      expect(updated.certificateRangeEnd).toBe(base + 1500);
+      expect(updated.lastCertificate).toBe(String(base + 999).padStart(6, "0"));
+    } finally {
+      await removeAuthUserFixture(created.user.id);
+    }
+  });
+
+  it("rejects a certificate limit ending before the last issued certificate", async () => {
+    const base = Math.floor(800000 + Math.random() * 100000);
+    const created = await createAuthUserFixture({
+      role: targetRole,
+      username: uniqueValue("invalid-range"),
+      fullName: `Usuario rango invalido ${uniqueValue("x")}`,
+      email: `${uniqueValue("invalid-range")}@example.com`,
+      dni: `${Math.floor(10000000 + Math.random() * 90000000)}`,
+      certificateRangeStart: base,
+      certificateRangeEnd: base + 999,
+      lastCertificate: base + 900,
+    });
+
+    try {
+      await expect(usersService.updateUser(created.user.id, {
+        certificateRangeStart: base,
+        certificateRangeEnd: base + 899,
+      }, "Admin")).rejects.toMatchObject({
+        message: "El ultimo certificado emitido queda fuera del nuevo rango",
+      });
+    } finally {
+      await removeAuthUserFixture(created.user.id);
+    }
+  });
 });
