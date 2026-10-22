@@ -10,8 +10,8 @@ const HEADER_CODE_Y = 0.7 * CM_TO_POINTS;
 const HEADER_CODE_RIGHT_MARGIN = 1.5 * CM_TO_POINTS;
 const HEADER_CODE_WIDTH = WIDTH - HEADER_CODE_X - HEADER_CODE_RIGHT_MARGIN;
 const HEADER_CODE_COLOR = "#d46f79";
-const HEADER_CODE_MAX_FONT_SIZE = 11;
-const HEADER_CODE_MIN_FONT_SIZE = 8;
+const HEADER_CODE_MAX_FONT_SIZE = 13;
+const HEADER_CODE_MIN_FONT_SIZE = 10;
 const HEADER_CODE_FONT = "Courier-Bold"; // monoespaciada, la más cercana a un sello numerador entre las 14 estándar de PDFKit
 
 const toUpperDisplay = (value) => String(value ?? "").toUpperCase();

@@ -10,6 +10,10 @@ const createDocStub = (factor = 0.6) => {
       calls.push({ type: "fillColor", color });
       return this;
     },
+    fillOpacity(value) {
+      calls.push({ type: "fillOpacity", value });
+      return this;
+    },
     font(name) {
       calls.push({ type: "font", name, fontSize: this._fontSize });
       return this;
@@ -51,7 +55,7 @@ describe("certificate template header code", () => {
     });
     expect(textCall.options.width).toBeGreaterThan(140);
     expect(textCall.options.width).toBeLessThan(145);
-    expect(textCall.fontSize).toBe(11);
+    expect(textCall.fontSize).toBe(13);
   });
 
   it("reduces the font size when the code is long", () => {
@@ -62,6 +66,6 @@ describe("certificate template header code", () => {
     const textCall = doc.calls.find((call) => call.type === "text");
 
     expect(textCall).toBeDefined();
-    expect(textCall.fontSize).toBe(8);
+    expect(textCall.fontSize).toBe(10);
   });
 });
