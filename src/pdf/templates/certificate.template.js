@@ -5,13 +5,10 @@ const { buildCertificateVerificationUrl } = require("../../api/certificates/util
 const WIDTH = 595.28;
 const HEIGHT = 841.89;
 const CM_TO_POINTS = 28.3464567;
-const HEADER_CODE_X = 14.0 * CM_TO_POINTS;
+const HEADER_CODE_X = 1.5 * CM_TO_POINTS;
 const HEADER_CODE_Y = 1.0 * CM_TO_POINTS;
-const HEADER_CODE_RIGHT_MARGIN = 1.5 * CM_TO_POINTS;
-const HEADER_CODE_WIDTH = WIDTH - HEADER_CODE_X - HEADER_CODE_RIGHT_MARGIN;
-const HEADER_CODE_RESERVED_SUFFIX = " C.C.A.";
+const HEADER_CODE_WIDTH = 4.0 * CM_TO_POINTS;
 const HEADER_CODE_COLOR = "#c00000";
-const HEADER_CODE_REFERENCE_FONT_SIZE = 13;
 const HEADER_CODE_MAX_FONT_SIZE = 18;
 const HEADER_CODE_MIN_FONT_SIZE = 10;
 const HEADER_CODE_FONT = "Courier-Bold"; // monoespaciada, la más cercana a un sello numerador entre las 14 estándar de PDFKit
@@ -46,18 +43,16 @@ const drawHeaderCode = (doc, code) => {
   const text = formatHeaderCode(code);
   let fontSize = HEADER_CODE_MAX_FONT_SIZE;
 
-  doc.font(HEADER_CODE_FONT).fontSize(HEADER_CODE_REFERENCE_FONT_SIZE);
-  const availableWidth = HEADER_CODE_WIDTH - doc.widthOfString(HEADER_CODE_RESERVED_SUFFIX);
-
+  doc.font(HEADER_CODE_FONT);
   for (; fontSize >= HEADER_CODE_MIN_FONT_SIZE; fontSize -= 1) {
     doc.fontSize(fontSize);
-    if (doc.widthOfString(text) <= availableWidth) break;
+    if (doc.widthOfString(text) <= HEADER_CODE_WIDTH) break;
   }
 
   doc.fillColor(HEADER_CODE_COLOR).fillOpacity(1);
   doc.text(text, HEADER_CODE_X, HEADER_CODE_Y, {
-    width: availableWidth,
-    align: "right",
+    width: HEADER_CODE_WIDTH,
+    align: "left",
     lineBreak: false,
   });
 

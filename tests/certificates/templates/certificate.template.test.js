@@ -38,7 +38,7 @@ describe("certificate template header code", () => {
     expect(formatHeaderCode("024421")).toBe("Nº 024421");
   });
 
-  it("draws the header code in the top right corner", () => {
+  it("draws the header code in the top left corner", () => {
     const doc = createDocStub(0.6);
 
     drawHeaderCode(doc, "024421");
@@ -47,15 +47,13 @@ describe("certificate template header code", () => {
 
     expect(textCall).toBeDefined();
     expect(textCall.text).toBe("Nº 024421");
-    expect(textCall.x).toBeCloseTo(396.9, 1);
+    expect(textCall.x).toBeCloseTo(42.5, 1);
     expect(textCall.y).toBeCloseTo(28.3, 1);
     expect(textCall.options).toMatchObject({
-      align: "right",
+      align: "left",
       lineBreak: false,
     });
-    expect(textCall.options.width).toBeGreaterThan(100);
-    expect(textCall.options.width).toBeLessThan(103);
-    expect(textCall.x + textCall.options.width).toBeCloseTo(498.2, 1);
+    expect(textCall.options.width).toBeCloseTo(113.4, 1);
     expect(textCall.fontSize).toBe(18);
   });
 
