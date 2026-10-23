@@ -47,16 +47,16 @@ describe("certificate template header code", () => {
 
     expect(textCall).toBeDefined();
     expect(textCall.text).toBe("Nº 024421");
-    expect(textCall.x).toBeCloseTo(411.0, 1);
+    expect(textCall.x).toBeCloseTo(382.7, 1);
     expect(textCall.y).toBeCloseTo(28.3, 1);
     expect(textCall.options).toMatchObject({
       align: "right",
       lineBreak: false,
     });
-    expect(textCall.options.width).toBeGreaterThan(85);
-    expect(textCall.options.width).toBeLessThan(90);
+    expect(textCall.options.width).toBeGreaterThan(114);
+    expect(textCall.options.width).toBeLessThan(117);
     expect(textCall.x + textCall.options.width).toBeCloseTo(498.2, 1);
-    expect(textCall.fontSize).toBe(13);
+    expect(textCall.fontSize).toBe(20);
   });
 
   it("reduces the font size when the code is long", () => {
