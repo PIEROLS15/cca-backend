@@ -15,8 +15,6 @@ describe("auth service", () => {
       email: `service-${Date.now()}@example.com`,
       dni: `${Math.floor(10000000 + Math.random() * 90000000)}`,
       password: "Secret123!",
-      certificateRangeStart: 10,
-      certificateRangeEnd: 20,
       lastCertificate: 12,
     });
   });

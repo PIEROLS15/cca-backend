@@ -35,26 +35,27 @@ const createDocStub = (factor = 0.6) => {
 
 describe("certificate template header code", () => {
   it("formats the code label", () => {
-    expect(formatHeaderCode("024421")).toBe("Nº 024421 C.C.A.");
+    expect(formatHeaderCode("024421")).toBe("Nº 024421");
   });
 
   it("draws the header code in the top right corner", () => {
-    const doc = createDocStub(0.5);
+    const doc = createDocStub(0.6);
 
     drawHeaderCode(doc, "024421");
 
     const textCall = doc.calls.find((call) => call.type === "text");
 
     expect(textCall).toBeDefined();
-    expect(textCall.text).toBe("Nº 024421 C.C.A.");
+    expect(textCall.text).toBe("Nº 024421");
     expect(textCall.x).toBeCloseTo(411.0, 1);
-    expect(textCall.y).toBeCloseTo(19.8, 1);
+    expect(textCall.y).toBeCloseTo(28.3, 1);
     expect(textCall.options).toMatchObject({
       align: "right",
       lineBreak: false,
     });
-    expect(textCall.options.width).toBeGreaterThan(140);
-    expect(textCall.options.width).toBeLessThan(145);
+    expect(textCall.options.width).toBeGreaterThan(85);
+    expect(textCall.options.width).toBeLessThan(90);
+    expect(textCall.x + textCall.options.width).toBeCloseTo(498.2, 1);
     expect(textCall.fontSize).toBe(13);
   });
 

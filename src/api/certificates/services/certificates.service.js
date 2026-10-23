@@ -2,7 +2,7 @@ const { Prisma } = require("@prisma/client");
 const prisma = require("../../../config/prisma");
 const HttpError = require("../../../utils/http-error");
 const { buildPaginationResult, getPaginationParams } = require("../../../utils/pagination");
-const { formatCertificateSequence } = require("../../../utils/certificate-range.utils");
+const { formatCertificateSequence } = require("../../../utils/certificate-sequence.utils");
 const {
   normalizeCertificateStatus,
   normalizeTerrainMeasurementMode,
@@ -83,6 +83,8 @@ const syncCertificateOwners = async (tx, certificateId, ownerIds) => {
 
 const MAX_CERTIFICATE_WRITE_RETRIES = 3;
 
+const isRetryableCertificateWriteError = (error) => error?.code === "P2034" || error?.code === "P2002";
+
 const runCertificateWriteTransaction = async (handler) => {
   let attempt = 0;
 
@@ -95,39 +97,21 @@ const runCertificateWriteTransaction = async (handler) => {
     } catch (error) {
       attempt += 1;
 
-      if (error?.code !== "P2034" || attempt >= MAX_CERTIFICATE_WRITE_RETRIES) {
+      if (!isRetryableCertificateWriteError(error) || attempt >= MAX_CERTIFICATE_WRITE_RETRIES) {
         throw error;
       }
     }
   }
 };
 
-const reserveCertificateNumberForUser = async (tx, userId) => {
-  const user = await tx.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      certificateRangeStart: true,
-      certificateRangeEnd: true,
-      lastCertificate: true,
-    },
-  });
+const reserveNextCertificateNumber = async (tx, userId) => {
+  const rows = await tx.$queryRaw`
+    SELECT COALESCE(MAX(CAST(NULLIF(REGEXP_REPLACE("certificateNumber", '\\D', '', 'g'), '') AS INTEGER)), 0) + 1 AS "nextSequence"
+    FROM "Certificate"`;
 
-  if (!user) {
-    throw new HttpError(404, "Usuario no encontrado");
-  }
-
-  if (user.certificateRangeStart == null || user.certificateRangeEnd == null) {
-    throw new HttpError(409, "El usuario no tiene un limite de certificados asignado");
-  }
-
-  const currentLast = user.lastCertificate == null
-    ? user.certificateRangeStart - 1
-    : Math.max(Number(user.lastCertificate), user.certificateRangeStart - 1);
-  const nextSequence = currentLast + 1;
-
-  if (nextSequence < user.certificateRangeStart || nextSequence > user.certificateRangeEnd) {
-    throw new HttpError(409, "El usuario ya alcanzo su limite de certificados");
+  const nextSequence = Number(rows?.[0]?.nextSequence ?? 0);
+  if (!Number.isInteger(nextSequence) || nextSequence <= 0) {
+    throw new Error("No se pudo generar el numero de certificado");
   }
 
   await tx.user.update({
@@ -295,7 +279,7 @@ const createCertificate = async (payload, userId) => {
       throw new HttpError(404, "Sector no encontrado");
     }
 
-    const certificateNumber = formatCertificateSequence(await reserveCertificateNumberForUser(tx, userId));
+    const certificateNumber = formatCertificateSequence(await reserveNextCertificateNumber(tx, userId));
     if (!certificateNumber) {
       throw new Error("No se pudo generar el numero de certificado");
     }
