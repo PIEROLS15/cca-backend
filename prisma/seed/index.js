@@ -8,7 +8,6 @@ const { seedTerrainTypes } = require("./terrain-types");
 const { seedClients, syncClientSequence } = require("./clients");
 const { seedCertificateRequests } = require("./certificate-requests");
 const { seedCertificates } = require("./certificates");
-const { assignCertificateRanges } = require("./assign-certificate-ranges");
 const { seedAssemblyRecordRequests } = require("./assembly-record-requests");
 const { seedCommonerLicenses, syncCommonerLicenseSequence } = require("./commoner-licenses");
 
@@ -34,7 +33,6 @@ const SEEDERS = [
     await fn(prisma, api);
   }
 
-  await assignCertificateRanges(prisma);
   await syncRoleSequence(prisma);
   await syncUserSequence(prisma);
   await syncClientSequence(prisma);

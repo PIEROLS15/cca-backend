@@ -9,8 +9,6 @@ describe("users utils", () => {
       email: "user@example.com",
       dni: "12345678",
       isActive: true,
-      certificateRangeStart: 10,
-      certificateRangeEnd: 20,
       lastCertificate: 9,
       role: {
         id: 2,

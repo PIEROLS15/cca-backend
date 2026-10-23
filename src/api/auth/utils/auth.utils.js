@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const { getRoleGroup } = require("../../../utils/access-control.utils");
-const { formatCertificateSequence } = require("../../../utils/certificate-range.utils");
+const { formatCertificateSequence } = require("../../../utils/certificate-sequence.utils");
 
 const createAccessToken = (user) =>
   jwt.sign(
@@ -23,8 +23,6 @@ const sanitizeUser = (user) => ({
   email: user.email,
   dni: user.dni,
   isActive: user.isActive,
-  certificateRangeStart: user.certificateRangeStart ?? null,
-  certificateRangeEnd: user.certificateRangeEnd ?? null,
   lastCertificate: formatCertificateSequence(user.lastCertificate),
   role: user.role
     ? {

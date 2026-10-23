@@ -91,8 +91,6 @@ describe("certificates service", () => {
       fullName: `Emisor IT ${uniqueValue("issuer")}`,
       email: `${uniqueValue("issuer")}@example.com`,
       dni: `${Math.floor(10000000 + Math.random() * 90000000)}`,
-      certificateRangeStart: 990000,
-      certificateRangeEnd: 990010,
     });
   });
 

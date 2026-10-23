@@ -203,8 +203,6 @@ Example response:
       "email": "piero@gmail.com",
       "dni": "73171545",
       "isActive": true,
-      "certificateRangeStart": null,
-      "certificateRangeEnd": null,
       "lastCertificate": null,
       "role": {
         "id": 1,
@@ -251,7 +249,7 @@ Body:
 Actualiza un usuario existente.
 
 Body puede incluir:
-`username`, `password`, `fullName`, `email`, `dni`, `roleId`, `certificateRangeStart`, `certificateRangeEnd`
+`username`, `password`, `fullName`, `email`, `dni`, `roleId`
 
 ### PATCH `/api/users/:id/status`
 Activa o desactiva un usuario.

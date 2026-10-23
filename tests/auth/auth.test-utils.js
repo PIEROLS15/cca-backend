@@ -39,8 +39,6 @@ const createAuthUserFixture = async (overrides = {}) => {
       email: overrides.email === undefined ? `auth-${uniqueSuffix()}@example.com` : overrides.email,
       dni: overrides.dni === undefined ? `${crypto.randomInt(10000000, 99999999)}` : overrides.dni,
       isActive: overrides.isActive ?? true,
-      certificateRangeStart: overrides.certificateRangeStart ?? null,
-      certificateRangeEnd: overrides.certificateRangeEnd ?? null,
       lastCertificate: overrides.lastCertificate ?? null,
       roleId: role.id,
     },
