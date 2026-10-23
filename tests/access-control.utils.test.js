@@ -4,7 +4,6 @@ const {
   getAllowedModuleKeys,
   canAccessModule,
   canManageUserRole,
-  canManageCertificateLimit,
 } = require("../src/utils/access-control.utils");
 
 describe("access-control utils", () => {
@@ -23,7 +22,5 @@ describe("access-control utils", () => {
     expect(canManageUserRole("SuperAdmin", "Admin")).toBe(false);
     expect(canManageUserRole("SuperAdmin", "Supervisor")).toBe(true);
     expect(canManageUserRole("Presidente", "Asistente")).toBe(true);
-    expect(canManageCertificateLimit("Presidente")).toBe(true);
-    expect(canManageCertificateLimit("Asistente")).toBe(false);
   });
 });

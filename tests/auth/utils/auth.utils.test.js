@@ -11,8 +11,6 @@ describe("auth utils", () => {
       fullName: "Auth Utils User",
       email: `utils-${Date.now()}@example.com`,
       dni: `${Date.now()}`.slice(-8),
-      certificateRangeStart: 10,
-      certificateRangeEnd: 20,
       lastCertificate: 12,
     });
   });
@@ -40,8 +38,6 @@ describe("auth utils", () => {
       fullName: fixture.user.fullName,
       email: fixture.user.email,
       dni: fixture.user.dni,
-      certificateRangeStart: 10,
-      certificateRangeEnd: 20,
       lastCertificate: "000012",
       role: {
         id: fixture.user.role.id,

@@ -1,5 +1,5 @@
 const { getRoleGroup } = require("../../../utils/access-control.utils");
-const { formatCertificateSequence } = require("../../../utils/certificate-range.utils");
+const { formatCertificateSequence } = require("../../../utils/certificate-sequence.utils");
 
 const sanitizeUser = (user) => ({
   id: user.id,
@@ -8,8 +8,6 @@ const sanitizeUser = (user) => ({
   email: user.email,
   dni: user.dni,
   isActive: user.isActive,
-  certificateRangeStart: user.certificateRangeStart ?? null,
-  certificateRangeEnd: user.certificateRangeEnd ?? null,
   lastCertificate: formatCertificateSequence(user.lastCertificate),
   role: user.role
     ? {
